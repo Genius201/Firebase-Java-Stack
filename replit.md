@@ -6,11 +6,12 @@ A mobile app for comedians to manage their comedy sets, perform with a synced co
 ## Architecture
 - **Frontend**: Expo React Native with Expo Router (file-based routing), stack navigation (no tabs)
 - **Backend**: Express.js with Gemini AI integration for feedback generation
-- **Storage**: AsyncStorage for local persistence of sets and performances
+- **Storage**: AsyncStorage for local persistence of sets, performances, and brain drain notes
 - **AI**: Google Gemini via Replit AI Integrations for post-performance comedy coaching feedback
 
 ## Key Screens
-- `app/index.tsx` - Home screen listing all comedy sets with create/edit/delete/perform actions
+- `app/index.tsx` - Home screen with quick-action buttons (Brain Drain, Build a Set) and set list with create/edit/delete/perform actions
+- `app/brain-drain.tsx` - Quick idea capture with 5 tag types (Bit Idea, Punchline, Premise, Callback, General), tag filtering, edit/delete
 - `app/create-set.tsx` - Set builder with bits, notes, durations, reordering
 - `app/perform.tsx` - Performance mode with large countdown timer, synced scrolling notes, audio recording
 - `app/feedback.tsx` - Post-performance review with timing stats, audio playback, AI coaching feedback

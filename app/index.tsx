@@ -9,7 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import { Ionicons, Feather } from "@expo/vector-icons";
+import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
@@ -152,6 +152,11 @@ export default function HomeScreen() {
     router.push("/history");
   };
 
+  const handleBrainDrain = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push("/brain-drain");
+  };
+
   return (
     <View
       style={[
@@ -178,6 +183,44 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      <View style={styles.quickActions}>
+        <Pressable
+          onPress={handleBrainDrain}
+          style={({ pressed }) => [
+            styles.quickAction,
+            styles.quickActionBrain,
+            pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          ]}
+        >
+          <MaterialCommunityIcons name="brain" size={22} color={Colors.accent} />
+          <View style={styles.quickActionText}>
+            <Text style={styles.quickActionTitle}>Brain Drain</Text>
+            <Text style={styles.quickActionDesc}>Capture ideas</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={Colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          onPress={handleCreateNew}
+          style={({ pressed }) => [
+            styles.quickAction,
+            styles.quickActionSet,
+            pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          ]}
+        >
+          <Ionicons name="list" size={22} color={Colors.amber} />
+          <View style={styles.quickActionText}>
+            <Text style={styles.quickActionTitle}>Build a Set</Text>
+            <Text style={styles.quickActionDesc}>Create set list</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={Colors.textMuted} />
+        </Pressable>
+      </View>
+
+      {sets.length > 0 && (
+        <Text style={styles.sectionLabel}>Your Sets</Text>
+      )}
+
       <FlatList
         data={sets}
         keyExtractor={(item) => item.id}
@@ -199,17 +242,6 @@ export default function HomeScreen() {
           ) : null
         }
       />
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.fab,
-          pressed && styles.fabPressed,
-          { marginBottom: 16 },
-        ]}
-        onPress={handleCreateNew}
-      >
-        <Ionicons name="add" size={28} color={Colors.navy} />
-      </Pressable>
     </View>
   );
 }
@@ -348,24 +380,50 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 40,
   },
-  fab: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.amber,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 8,
-    shadowColor: Colors.amber,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+  quickActions: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 10,
+    marginBottom: 12,
   },
-  fabPressed: {
-    transform: [{ scale: 0.92 }],
-    opacity: 0.9,
+  quickAction: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  quickActionBrain: {
+    backgroundColor: "rgba(124, 92, 252, 0.08)",
+    borderColor: "rgba(124, 92, 252, 0.2)",
+  },
+  quickActionSet: {
+    backgroundColor: "rgba(245, 166, 35, 0.08)",
+    borderColor: "rgba(245, 166, 35, 0.2)",
+  },
+  quickActionText: {
+    flex: 1,
+  },
+  quickActionTitle: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  quickActionDesc: {
+    fontSize: 11,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textSecondary,
+    paddingHorizontal: 22,
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
 });

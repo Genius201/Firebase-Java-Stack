@@ -1,3 +1,11 @@
+export interface BrainDrainNote {
+  id: string;
+  text: string;
+  tag: "bit-idea" | "punchline" | "premise" | "callback" | "general";
+  createdAt: number;
+  usedInSetId: string | null;
+}
+
 export interface Bit {
   id: string;
   title: string;

@@ -1,8 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { ComedySet, Performance } from "./types";
+import type { BrainDrainNote, ComedySet, Performance } from "./types";
 
 const SETS_KEY = "@setflow_sets";
 const PERFORMANCES_KEY = "@setflow_performances";
+const BRAINDRAIN_KEY = "@setflow_braindrain";
 
 export async function getSets(): Promise<ComedySet[]> {
   const data = await AsyncStorage.getItem(SETS_KEY);
@@ -49,5 +50,29 @@ export async function deletePerformance(id: string): Promise<void> {
   await AsyncStorage.setItem(
     PERFORMANCES_KEY,
     JSON.stringify(perfs.filter((p) => p.id !== id))
+  );
+}
+
+export async function getBrainDrainNotes(): Promise<BrainDrainNote[]> {
+  const data = await AsyncStorage.getItem(BRAINDRAIN_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export async function saveBrainDrainNote(note: BrainDrainNote): Promise<void> {
+  const notes = await getBrainDrainNotes();
+  const idx = notes.findIndex((n) => n.id === note.id);
+  if (idx >= 0) {
+    notes[idx] = note;
+  } else {
+    notes.unshift(note);
+  }
+  await AsyncStorage.setItem(BRAINDRAIN_KEY, JSON.stringify(notes));
+}
+
+export async function deleteBrainDrainNote(id: string): Promise<void> {
+  const notes = await getBrainDrainNotes();
+  await AsyncStorage.setItem(
+    BRAINDRAIN_KEY,
+    JSON.stringify(notes.filter((n) => n.id !== id))
   );
 }
