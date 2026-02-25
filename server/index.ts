@@ -167,7 +167,14 @@ function configureExpoAndLanding(app: express.Application) {
     "templates",
     "landing-page.html",
   );
+  const featuresTemplatePath = path.resolve(
+    process.cwd(),
+    "server",
+    "templates",
+    "features-page.html",
+  );
   const landingPageTemplate = fs.readFileSync(templatePath, "utf-8");
+  const featuresPageTemplate = fs.readFileSync(featuresTemplatePath, "utf-8");
   const appName = getAppName();
 
   log("Serving static Expo files with dynamic manifest routing");
@@ -177,13 +184,22 @@ function configureExpoAndLanding(app: express.Application) {
       return next();
     }
 
-    if (req.path !== "/" && req.path !== "/manifest") {
+    if (req.path !== "/" && req.path !== "/manifest" && req.path !== "/features") {
       return next();
     }
 
     const platform = req.header("expo-platform");
     if (platform && (platform === "ios" || platform === "android")) {
       return serveExpoManifest(platform, res);
+    }
+
+    if (req.path === "/features") {
+      return serveLandingPage({
+        req,
+        res,
+        landingPageTemplate: featuresPageTemplate,
+        appName,
+      });
     }
 
     if (req.path === "/") {
