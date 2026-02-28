@@ -113,11 +113,18 @@ function BitNoteCard({
 
 export default function PerformScreen() {
   const insets = useSafeAreaInsets();
-  const { setId } = useLocalSearchParams<{ setId: string }>();
+  const { setId, startBit, recMode } = useLocalSearchParams<{
+    setId: string;
+    startBit?: string;
+    recMode?: string;
+  }>();
+  const startBitIndex = parseInt(startBit || "0") || 0;
+  const recordingMode = (recMode || "audio") as "audio" | "video" | "none";
+
   const [comedySet, setComedySet] = useState<ComedySet | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [currentBitIndex, setCurrentBitIndex] = useState(0);
+  const [currentBitIndex, setCurrentBitIndex] = useState(startBitIndex);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [hasFinished, setHasFinished] = useState(false);
@@ -142,7 +149,15 @@ export default function PerformScreen() {
   const loadSet = async () => {
     const sets = await getSets();
     const found = sets.find((s) => s.id === setId);
-    if (found) setComedySet(found);
+    if (found) {
+      setComedySet(found);
+      if (startBitIndex > 0) {
+        const skipTime = found.bits
+          .slice(0, startBitIndex)
+          .reduce((sum, b) => sum + b.duration, 0);
+        setElapsed(skipTime);
+      }
+    }
   };
 
   const getCumulativeTime = useCallback(
@@ -297,6 +312,10 @@ export default function PerformScreen() {
     setTimeout(() => setManualBitOverride(false), 5000);
   };
 
+  const timerPulse = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+  }));
+
   if (!comedySet) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
@@ -320,10 +339,6 @@ export default function PerformScreen() {
     1
   );
 
-  const timerPulse = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseAnim.value }],
-  }));
-
   return (
     <View
       style={[
@@ -341,20 +356,30 @@ export default function PerformScreen() {
         <Text style={styles.setTitleSmall} numberOfLines={1}>
           {comedySet.title}
         </Text>
-        <Pressable
-          onPress={toggleRecording}
-          style={({ pressed }) => [
-            styles.recButton,
-            isRecording && styles.recButtonActive,
-            pressed && { opacity: 0.8 },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name={isRecording ? "stop" : "microphone"}
-            size={20}
-            color={isRecording ? "#fff" : Colors.danger}
-          />
-        </Pressable>
+        {recordingMode !== "none" ? (
+          <Pressable
+            onPress={toggleRecording}
+            style={({ pressed }) => [
+              styles.recButton,
+              isRecording && styles.recButtonActive,
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={
+                isRecording
+                  ? "stop"
+                  : recordingMode === "video"
+                    ? "video"
+                    : "microphone"
+              }
+              size={20}
+              color={isRecording ? "#fff" : Colors.danger}
+            />
+          </Pressable>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <View style={styles.timerSection}>

@@ -32,6 +32,7 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="brain-drain" />
+      <Stack.Screen name="perform-setup" />
       <Stack.Screen name="create-set" />
       <Stack.Screen name="perform" />
       <Stack.Screen name="feedback" />

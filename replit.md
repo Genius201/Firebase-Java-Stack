@@ -10,10 +10,11 @@ A mobile app for comedians to manage their comedy sets, perform with a synced co
 - **AI**: Google Gemini via Replit AI Integrations for post-performance comedy coaching feedback
 
 ## Key Screens
-- `app/index.tsx` - Home screen with quick-action buttons (Brain Drain, Build a Set) and set list with create/edit/delete/perform actions
+- `app/index.tsx` - Home screen with Perform Set button, quick-action buttons (Brain Drain, Build a Set), and set list
 - `app/brain-drain.tsx` - Quick idea capture with 5 tag types (Bit Idea, Punchline, Premise, Callback, General), tag filtering, edit/delete
+- `app/perform-setup.tsx` - Pre-performance setup: select set, choose starting bit, pick recording mode (audio/video/none)
 - `app/create-set.tsx` - Set builder with bits, notes, durations, reordering
-- `app/perform.tsx` - Performance mode with large countdown timer, synced scrolling notes, audio recording
+- `app/perform.tsx` - Performance mode with large countdown timer, synced scrolling notes, audio/video recording
 - `app/feedback.tsx` - Post-performance review with timing stats, audio playback, AI coaching feedback
 - `app/history.tsx` - Performance history with recordings and feedback access
 

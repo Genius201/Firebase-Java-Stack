@@ -157,6 +157,11 @@ export default function HomeScreen() {
     router.push("/brain-drain");
   };
 
+  const handlePerformSetup = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push("/perform-setup");
+  };
+
   return (
     <View
       style={[
@@ -182,6 +187,17 @@ export default function HomeScreen() {
           <Ionicons name="time-outline" size={22} color={Colors.textSecondary} />
         </Pressable>
       </View>
+
+      <Pressable
+        onPress={handlePerformSetup}
+        style={({ pressed }) => [
+          styles.performSetButton,
+          pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+        ]}
+      >
+        <Ionicons name="play" size={22} color={Colors.navy} />
+        <Text style={styles.performSetButtonText}>Perform Set</Text>
+      </Pressable>
 
       <View style={styles.quickActions}>
         <Pressable
@@ -379,6 +395,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     paddingHorizontal: 40,
+  },
+  performSetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: Colors.amber,
+    marginHorizontal: 20,
+    marginBottom: 14,
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  performSetButtonText: {
+    fontSize: 17,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.navy,
   },
   quickActions: {
     flexDirection: "row",
