@@ -29,6 +29,10 @@ A mobile app for comedians to manage their comedy sets, perform with a synced co
 ## Backend Endpoints
 - `POST /api/feedback` - Analyzes set structure and returns AI coaching feedback
 
+## Web Landing Pages
+- `/` - Robust landing page with SetFlow logo lockup (shimmer animation), sticky nav with Sign In/Sign Up, hero section with animated background orbs + grid, 6-feature cards strip, live timer showcase, bottom CTA, footer. Accessibility: focus-visible styles, prefers-reduced-motion support.
+- `/features` - Full features page with phone mockup, how-it-works steps, QR download section
+
 ## Design
 - Dark theme (navy/charcoal with amber gold accents)
 - JetBrains Mono for timer display, Space Grotesk for UI text

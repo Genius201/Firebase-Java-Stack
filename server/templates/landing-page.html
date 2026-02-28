@@ -1,253 +1,327 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <title>APP_NAME_PLACEHOLDER</title>
+    <title>SetFlow — Your Comedy Set Assistant</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Time your set, follow your notes, record your performance, and get AI coaching — all from your phone." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
       rel="stylesheet"
     />
     <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      body {
-        font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont,
-          "Segoe UI", sans-serif;
-        background: #0f0f1a;
-        color: #fff;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        position: relative;
+      *{box-sizing:border-box;margin:0;padding:0}
+      html{scroll-behavior:smooth}
+      body{font-family:"Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f0f1a;color:#fff;min-height:100vh;overflow-x:hidden}
+
+      /* ── NAV ── */
+      nav{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:16px 40px;z-index:100;transition:background .35s,border-color .35s}
+      nav.scrolled{background:rgba(15,15,26,.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid rgba(255,255,255,.04)}
+      .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+      .nav-logo{width:36px;height:36px;border-radius:10px;object-fit:cover}
+      .nav-wordmark{font-size:20px;font-weight:700;background:linear-gradient(135deg,#f5a623,#ffcf6f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.4px}
+      .nav-right{display:flex;align-items:center;gap:10px}
+      .btn{display:inline-flex;align-items:center;justify-content:center;font-family:"Space Grotesk",sans-serif;font-weight:600;border:none;cursor:pointer;transition:all .25s;text-decoration:none;gap:8px}
+      .btn-nav{padding:10px 22px;font-size:14px;border-radius:10px}
+      .btn-ghost{background:transparent;color:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.1)}
+      .btn-ghost:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rgba(255,255,255,.2)}
+      .btn-primary{background:#f5a623;color:#0f0f1a}
+      .btn-primary:hover{background:#ffd280;transform:translateY(-1px);box-shadow:0 6px 24px rgba(245,166,35,.35)}
+      .btn-lg{padding:16px 36px;font-size:16px;border-radius:13px}
+      .btn-xl{padding:18px 44px;font-size:17px;border-radius:14px}
+
+      /* ── HERO ── */
+      .hero{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px;overflow:hidden}
+
+      /* ambient background orbs */
+      .orb{position:absolute;border-radius:50%;pointer-events:none;filter:blur(80px)}
+      .orb-1{top:-20%;left:30%;width:700px;height:700px;background:rgba(245,166,35,.07);animation:drift-1 18s ease-in-out infinite}
+      .orb-2{bottom:-10%;right:20%;width:500px;height:500px;background:rgba(124,92,252,.06);animation:drift-2 22s ease-in-out infinite}
+      .orb-3{top:40%;left:-10%;width:400px;height:400px;background:rgba(245,166,35,.04);animation:drift-3 15s ease-in-out infinite}
+      @keyframes drift-1{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,30px)}}
+      @keyframes drift-2{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,-20px)}}
+      @keyframes drift-3{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,-25px)}}
+
+      /* grid lines background */
+      .grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,black 30%,transparent 70%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,black 30%,transparent 70%);pointer-events:none}
+
+      .hero-inner{position:relative;z-index:2;text-align:center;max-width:800px}
+
+      /* logo lockup */
+      .logo-lockup{display:flex;flex-direction:column;align-items:center;margin-bottom:40px}
+      .logo-icon{width:100px;height:100px;border-radius:28px;box-shadow:0 20px 60px rgba(245,166,35,.2),0 0 0 1px rgba(245,166,35,.1);animation:logo-float 6s ease-in-out infinite;margin-bottom:20px}
+      @keyframes logo-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+      .logo-text{font-size:52px;font-weight:700;background:linear-gradient(135deg,#f5a623 0%,#ffcf6f 50%,#f5a623 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-2px;animation:shimmer 4s linear infinite}
+      @keyframes shimmer{to{background-position:200% center}}
+      .logo-tagline{font-size:15px;font-weight:400;color:rgba(255,255,255,.35);letter-spacing:.5px;margin-top:6px}
+
+      .hero-headline{font-size:48px;font-weight:700;color:#fff;letter-spacing:-1.8px;line-height:1.1;margin-bottom:20px}
+      .hero-headline .em{background:linear-gradient(135deg,#f5a623,#ffcf6f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .hero-sub{font-size:18px;color:rgba(255,255,255,.45);line-height:1.7;max-width:520px;margin:0 auto 44px}
+
+      .hero-actions{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+
+      .trust-line{display:flex;align-items:center;gap:8px;font-size:13px;color:rgba(255,255,255,.25);margin-top:8px}
+      .trust-dot{width:5px;height:5px;border-radius:50%;background:#2ed573}
+
+      /* ── FEATURES STRIP ── */
+      .features-strip{position:relative;z-index:2;padding:80px 24px;background:linear-gradient(180deg,rgba(15,15,26,0) 0%,rgba(20,20,38,.6) 30%,rgba(20,20,38,.6) 70%,rgba(15,15,26,0) 100%)}
+      .features-strip-inner{max-width:1040px;margin:0 auto}
+      .strip-label{text-align:center;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:#7c5cfc;margin-bottom:40px}
+      .features-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+      .f-card{background:rgba(30,30,54,.45);border:1px solid rgba(255,255,255,.04);border-radius:16px;padding:28px 24px;transition:all .3s;position:relative;overflow:hidden}
+      .f-card::after{content:"";position:absolute;inset:0;border-radius:16px;opacity:0;transition:opacity .3s;background:linear-gradient(135deg,rgba(245,166,35,.03),rgba(124,92,252,.03))}
+      .f-card:hover{border-color:rgba(255,255,255,.08);transform:translateY(-3px);box-shadow:0 16px 40px rgba(0,0,0,.25)}
+      .f-card:hover::after{opacity:1}
+      .f-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;position:relative;z-index:1}
+      .f-icon svg{width:22px;height:22px}
+      .f-title{font-size:16px;font-weight:600;color:#fff;margin-bottom:6px;position:relative;z-index:1}
+      .f-desc{font-size:13px;color:rgba(255,255,255,.38);line-height:1.6;position:relative;z-index:1}
+
+      /* ── LIVE TIMER SECTION ── */
+      .timer-section{padding:80px 24px;text-align:center;position:relative;overflow:hidden}
+      .timer-section::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;background:radial-gradient(circle,rgba(245,166,35,.06) 0%,transparent 60%);border-radius:50%;pointer-events:none}
+      .timer-section .strip-label{margin-bottom:24px}
+      .timer-title{font-size:28px;font-weight:700;color:#fff;letter-spacing:-.5px;margin-bottom:8px}
+      .timer-sub{font-size:14px;color:rgba(255,255,255,.35);margin-bottom:36px}
+      .timer-display{font-family:"JetBrains Mono",monospace;font-size:88px;font-weight:700;color:#f5a623;letter-spacing:-4px;text-shadow:0 0 80px rgba(245,166,35,.18);line-height:1;margin-bottom:16px;animation:t-pulse 3s ease-in-out infinite}
+      @keyframes t-pulse{0%,100%{opacity:1;text-shadow:0 0 80px rgba(245,166,35,.18)}50%{opacity:.85;text-shadow:0 0 100px rgba(245,166,35,.28)}}
+      .timer-elapsed{font-family:"JetBrains Mono",monospace;font-size:14px;color:rgba(255,255,255,.25);margin-bottom:32px}
+      .timer-bits{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+      .t-bit{padding:8px 18px;border-radius:10px;font-size:13px;font-weight:500}
+      .t-bit-done{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);color:rgba(255,255,255,.25);text-decoration:line-through}
+      .t-bit-active{background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.28);color:#f5a623}
+      .t-bit-next{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.4)}
+
+      /* ── CTA BOTTOM ── */
+      .cta-bottom{padding:80px 24px 100px;text-align:center;position:relative}
+      .cta-bottom::before{content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(ellipse,rgba(124,92,252,.06) 0%,transparent 60%);pointer-events:none}
+      .cta-heading{font-size:36px;font-weight:700;color:#fff;letter-spacing:-1px;margin-bottom:14px}
+      .cta-sub{font-size:16px;color:rgba(255,255,255,.4);max-width:420px;margin:0 auto 36px;line-height:1.6}
+      .cta-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+      .cta-learn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:rgba(255,255,255,.3);text-decoration:none;transition:color .2s}
+      .cta-learn:hover{color:rgba(255,255,255,.6)}
+      .cta-learn svg{transition:transform .2s}
+      .cta-learn:hover svg{transform:translateX(3px)}
+
+      /* ── FOOTER ── */
+      footer{text-align:center;padding:28px 24px;font-size:12px;color:rgba(255,255,255,.15);border-top:1px solid rgba(255,255,255,.03)}
+
+      /* ── LOADING ── */
+      .loading{display:none;text-align:center;padding:80px 0}
+      .spinner{border:2px solid rgba(255,255,255,.1);border-top-color:#f5a623;border-radius:50%;width:32px;height:32px;animation:spin .8s linear infinite;margin:20px auto}
+      @keyframes spin{to{transform:rotate(360deg)}}
+      .loading-text{font-size:15px;color:rgba(255,255,255,.5)}
+
+      /* ── ACCESSIBILITY ── */
+      .btn:focus-visible{outline:2px solid #f5a623;outline-offset:2px}
+      a:focus-visible{outline:2px solid #f5a623;outline-offset:2px}
+      @media(prefers-reduced-motion:reduce){
+        *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
       }
 
-      .bg-glow {
-        position: absolute;
-        border-radius: 50%;
-        pointer-events: none;
+      /* ── RESPONSIVE ── */
+      @media(max-width:900px){
+        .features-row{grid-template-columns:1fr 1fr}
       }
-      .bg-glow-1 {
-        top: -180px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 600px;
-        height: 600px;
-        background: radial-gradient(
-          circle,
-          rgba(245, 166, 35, 0.08) 0%,
-          transparent 60%
-        );
-      }
-      .bg-glow-2 {
-        bottom: -120px;
-        right: -80px;
-        width: 400px;
-        height: 400px;
-        background: radial-gradient(
-          circle,
-          rgba(124, 92, 252, 0.06) 0%,
-          transparent 60%
-        );
-      }
-
-      .content {
-        position: relative;
-        z-index: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-      }
-
-      .logo-img {
-        width: 120px;
-        height: 120px;
-        border-radius: 30px;
-        box-shadow: 0 12px 48px rgba(245, 166, 35, 0.18),
-          0 0 0 1px rgba(245, 166, 35, 0.08);
-        margin-bottom: 8px;
-      }
-
-      .app-name {
-        font-size: 44px;
-        font-weight: 700;
-        background: linear-gradient(135deg, #f5a623, #ffcf6f);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        letter-spacing: -1.5px;
-        margin-bottom: 4px;
-      }
-
-      .tagline {
-        font-size: 16px;
-        font-weight: 400;
-        color: rgba(255, 255, 255, 0.4);
-        margin-bottom: 40px;
-      }
-
-      .actions {
-        display: flex;
-        gap: 14px;
-        width: 100%;
-        max-width: 340px;
-      }
-
-      .btn {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 15px 24px;
-        font-family: "Space Grotesk", sans-serif;
-        font-size: 15px;
-        font-weight: 600;
-        border-radius: 13px;
-        border: none;
-        cursor: pointer;
-        transition: all 0.25s;
-        text-decoration: none;
-      }
-
-      .btn-signin {
-        background: transparent;
-        color: rgba(255, 255, 255, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-      }
-      .btn-signin:hover {
-        background: rgba(255, 255, 255, 0.06);
-        color: #fff;
-        border-color: rgba(255, 255, 255, 0.22);
-      }
-
-      .btn-signup {
-        background: #f5a623;
-        color: #0f0f1a;
-      }
-      .btn-signup:hover {
-        background: #ffd280;
-        transform: translateY(-1px);
-        box-shadow: 0 6px 24px rgba(245, 166, 35, 0.3);
-      }
-
-      .learn-more {
-        margin-top: 32px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-        font-weight: 500;
-        color: rgba(255, 255, 255, 0.25);
-        text-decoration: none;
-        transition: color 0.2s;
-      }
-      .learn-more:hover {
-        color: rgba(255, 255, 255, 0.5);
-      }
-      .learn-more svg {
-        transition: transform 0.2s;
-      }
-      .learn-more:hover svg {
-        transform: translateX(3px);
-      }
-
-      .loading {
-        display: none;
-        text-align: center;
-      }
-      .spinner {
-        border: 2px solid rgba(255, 255, 255, 0.1);
-        border-top-color: #f5a623;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        animation: spin 0.8s linear infinite;
-        margin: 20px auto;
-      }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-      .loading-text {
-        font-size: 15px;
-        color: rgba(255, 255, 255, 0.5);
-      }
-
-      @media (max-width: 480px) {
-        .logo-img {
-          width: 96px;
-          height: 96px;
-          border-radius: 24px;
-        }
-        .app-name {
-          font-size: 36px;
-        }
-        .tagline {
-          font-size: 14px;
-        }
-        .actions {
-          flex-direction: column;
-          max-width: 280px;
-        }
+      @media(max-width:640px){
+        nav{padding:12px 16px}
+        .nav-wordmark{font-size:17px}
+        .btn-nav{padding:8px 16px;font-size:13px}
+        .hero{padding:100px 16px 60px;min-height:auto}
+        .logo-icon{width:80px;height:80px;border-radius:22px}
+        .logo-text{font-size:40px}
+        .hero-headline{font-size:32px;letter-spacing:-1px}
+        .hero-sub{font-size:15px}
+        .hero-actions{flex-direction:column;width:100%;max-width:300px;margin-left:auto;margin-right:auto}
+        .btn-xl,.btn-lg{width:100%}
+        .features-row{grid-template-columns:1fr;max-width:400px;margin:0 auto}
+        .timer-display{font-size:56px;letter-spacing:-2px}
+        .cta-heading{font-size:26px}
+        .cta-actions{flex-direction:column;max-width:280px;margin-left:auto;margin-right:auto}
       }
     </style>
   </head>
   <body>
-    <div class="bg-glow bg-glow-1"></div>
-    <div class="bg-glow bg-glow-2"></div>
 
+    <!-- NAV -->
+    <nav id="nav">
+      <a href="/" class="nav-brand">
+        <img src="/assets/images/icon.png" alt="SetFlow" class="nav-logo" />
+        <span class="nav-wordmark">SetFlow</span>
+      </a>
+      <div class="nav-right">
+        <a href="#" class="btn btn-nav btn-ghost" id="signin-btn-nav">Sign In</a>
+        <a href="#" class="btn btn-nav btn-primary" id="signup-btn-nav">Sign Up</a>
+      </div>
+    </nav>
+
+    <!-- LOADING (Expo redirect) -->
     <div class="loading" id="loading">
       <div class="spinner"></div>
       <div class="loading-text">Opening in Expo Go...</div>
     </div>
 
-    <div class="content" id="content">
-      <img
-        src="/assets/images/icon.png"
-        alt="APP_NAME_PLACEHOLDER"
-        class="logo-img"
-      />
-      <h1 class="app-name">APP_NAME_PLACEHOLDER</h1>
-      <p class="tagline">Your comedy set assistant</p>
+    <!-- MAIN CONTENT -->
+    <div id="content">
 
-      <div class="actions">
-        <a href="#" class="btn btn-signin" id="signin-btn">Sign In</a>
-        <a href="#" class="btn btn-signup" id="signup-btn">Sign Up</a>
-      </div>
+      <!-- HERO -->
+      <section class="hero">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="grid-bg"></div>
 
-      <a href="/features" class="learn-more">
-        Learn more
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-      </a>
+        <div class="hero-inner">
+          <div class="logo-lockup">
+            <img src="/assets/images/icon.png" alt="SetFlow" class="logo-icon" />
+            <div class="logo-text">SetFlow</div>
+            <div class="logo-tagline">Your comedy set assistant</div>
+          </div>
+
+          <h1 class="hero-headline">Own every second<br/>on <span class="em">stage</span></h1>
+          <p class="hero-sub">Time your set, follow your notes, record your performance, and get AI-powered coaching — all from your phone.</p>
+
+          <div class="hero-actions">
+            <a href="#" class="btn btn-primary btn-xl" id="signup-btn-hero" role="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+              Sign Up Free
+            </a>
+            <a href="#" class="btn btn-ghost btn-xl" id="signin-btn-hero">Sign In</a>
+          </div>
+
+          <div class="trust-line">
+            <span class="trust-dot"></span>
+            Free to use &middot; No credit card required
+          </div>
+        </div>
+      </section>
+
+      <!-- FEATURES STRIP -->
+      <section class="features-strip">
+        <div class="features-strip-inner">
+          <div class="strip-label">Everything you need on stage</div>
+          <div class="features-row">
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(245,166,35,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="f-title">Live Countdown Timer</div>
+              <div class="f-desc">A large, glanceable timer that counts down your total set and each individual bit so you always know where you stand.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(124,92,252,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </div>
+              <div class="f-title">Synced Set Notes</div>
+              <div class="f-desc">Your punchlines, tags, and stage directions scroll automatically as each bit advances — never lose your place.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(255,71,87,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#ff4757" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+              <div class="f-title">Audio Recording</div>
+              <div class="f-desc">Capture every performance to replay later. Review your timing, crowd work, and delivery in high quality audio.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(245,166,35,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <div class="f-title">AI Coach Feedback</div>
+              <div class="f-desc">Get personalized coaching from Google Gemini after every set — pacing tips, bit analysis, and actionable suggestions.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(124,92,252,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3-1.5 5-3 6.5V18a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.5C6.5 14 5 12 5 9a7 7 0 0 1 7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+              </div>
+              <div class="f-title">Brain Drain</div>
+              <div class="f-desc">Shower thought? Bar observation? Capture raw ideas instantly and tag them for later — before they disappear.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(46,213,115,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#2ed573" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </div>
+              <div class="f-title">Set List Builder</div>
+              <div class="f-desc">Drag, drop, and arrange your bits into a tight set. Set durations per bit and see your total time at a glance.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LIVE TIMER SHOWCASE -->
+      <section class="timer-section">
+        <div class="strip-label">Built for the stage</div>
+        <div class="timer-title">A timer you can actually read</div>
+        <div class="timer-sub">Large, high-contrast display designed to be glanced at from a stool under stage lights</div>
+        <div class="timer-display" id="live-timer">04:32</div>
+        <div class="timer-elapsed"><span id="elapsed-display">02:28</span> elapsed of 07:00</div>
+        <div class="timer-bits">
+          <span class="t-bit t-bit-done">Opening</span>
+          <span class="t-bit t-bit-active">Dating Life</span>
+          <span class="t-bit t-bit-next">Airport Bit</span>
+          <span class="t-bit t-bit-next">Closer</span>
+        </div>
+      </section>
+
+      <!-- BOTTOM CTA -->
+      <section class="cta-bottom">
+        <div class="cta-heading">Ready to crush your next set?</div>
+        <div class="cta-sub">Join comedians who use SetFlow to tighten their timing, organize their material, and get better after every show.</div>
+        <div class="cta-actions">
+          <a href="#" class="btn btn-primary btn-lg" id="signup-btn-bottom">Sign Up Free</a>
+          <a href="#" class="btn btn-ghost btn-lg" id="signin-btn-bottom">Sign In</a>
+        </div>
+        <a href="/features" class="cta-learn">
+          Explore all features
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </section>
+
+      <footer>&copy; 2026 SetFlow. Built for comedians, by people who get it.</footer>
     </div>
 
     <script>
-      (function () {
-        var ua = navigator.userAgent;
-        var loadingEl = document.getElementById("loading");
-        var contentEl = document.getElementById("content");
-        var isAndroid = /Android/i.test(ua);
-        var isIOS =
-          /iPhone|iPad|iPod/i.test(ua) ||
-          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-        var deepLink = "exps://EXPS_URL_PLACEHOLDER";
+      // Sticky nav background on scroll
+      (function(){
+        var nav=document.getElementById("nav");
+        window.addEventListener("scroll",function(){
+          nav.classList.toggle("scrolled",window.scrollY>40);
+        });
+      })();
 
-        if (isAndroid || isIOS) {
-          loadingEl.style.display = "block";
-          contentEl.style.display = "none";
-          window.location.href = deepLink;
-          setTimeout(function () {
-            loadingEl.style.display = "none";
-            contentEl.style.display = "block";
-          }, 500);
+      // Live timer animation
+      (function(){
+        var totalSec=420;
+        var elapsed=148;
+        var dir=1;
+        var timerEl=document.getElementById("live-timer");
+        var elapsedEl=document.getElementById("elapsed-display");
+        function fmt(s){var m=Math.floor(Math.abs(s)/60);var sc=Math.abs(s)%60;return(s<0?"-":"")+String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0")}
+        setInterval(function(){
+          elapsed+=dir;
+          if(elapsed>=totalSec-30) dir=-1;
+          if(elapsed<=60) dir=1;
+          var rem=totalSec-elapsed;
+          timerEl.textContent=fmt(rem);
+          elapsedEl.textContent=fmt(elapsed);
+        },1000);
+      })();
+
+      // Expo redirect on mobile
+      (function(){
+        var ua=navigator.userAgent;
+        var loadingEl=document.getElementById("loading");
+        var contentEl=document.getElementById("content");
+        var isAndroid=/Android/i.test(ua);
+        var isIOS=/iPhone|iPad|iPod/i.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+        var deepLink="exps://EXPS_URL_PLACEHOLDER";
+        if(isAndroid||isIOS){
+          loadingEl.style.display="block";
+          contentEl.style.display="none";
+          window.location.href=deepLink;
+          setTimeout(function(){loadingEl.style.display="none";contentEl.style.display="block"},500);
         }
       })();
     </script>
