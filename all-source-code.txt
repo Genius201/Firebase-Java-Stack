@@ -1,0 +1,6257 @@
+============================================
+  SetFlow - Comedian's Set Assistant
+  Complete Source Code
+============================================
+
+--------------------------------------------
+FILE: app/_layout.tsx
+--------------------------------------------
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import React, { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { queryClient } from "@/lib/query-client";
+import {
+  useFonts,
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from "@expo-google-fonts/space-grotesk";
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_700Bold,
+} from "@expo-google-fonts/jetbrains-mono";
+import Colors from "@/constants/colors";
+
+SplashScreen.preventAutoHideAsync();
+
+function RootLayoutNav() {
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: Colors.navy },
+        animation: "slide_from_right",
+      }}
+    >
+      <Stack.Screen name="index" />
+      <Stack.Screen name="brain-drain" />
+      <Stack.Screen name="perform-setup" />
+      <Stack.Screen name="create-set" />
+      <Stack.Screen name="perform" />
+      <Stack.Screen name="feedback" />
+      <Stack.Screen name="history" />
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
+
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardProvider>
+            <RootLayoutNav />
+          </KeyboardProvider>
+        </GestureHandlerRootView>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+}
+
+
+--------------------------------------------
+FILE: app/index.tsx
+--------------------------------------------
+import React, { useState, useCallback } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  Pressable,
+  Alert,
+  Platform,
+} from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import Colors from "@/constants/colors";
+import type { ComedySet } from "@/lib/types";
+import { getSets, deleteSet } from "@/lib/storage";
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function SetCard({
+  item,
+  onDelete,
+}: {
+  item: ComedySet;
+  onDelete: (id: string) => void;
+}) {
+  const handlePerform = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({ pathname: "/perform", params: { setId: item.id } });
+  };
+
+  const handleEdit = () => {
+    router.push({ pathname: "/create-set", params: { setId: item.id } });
+  };
+
+  const handleDelete = () => {
+    if (Platform.OS === "web") {
+      onDelete(item.id);
+      return;
+    }
+    Alert.alert("Delete Set", `Delete "${item.title}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => onDelete(item.id),
+      },
+    ]);
+  };
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={handleEdit}
+    >
+      <View style={styles.cardHeader}>
+        <View style={styles.cardTitleRow}>
+          <Ionicons name="mic" size={18} color={Colors.amber} />
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+        </View>
+        <Pressable
+          onPress={handleDelete}
+          hitSlop={12}
+          style={({ pressed }) => [{ opacity: pressed ? 0.5 : 1 }]}
+        >
+          <Feather name="trash-2" size={16} color={Colors.textMuted} />
+        </Pressable>
+      </View>
+
+      <View style={styles.cardMeta}>
+        <View style={styles.metaItem}>
+          <Feather name="clock" size={13} color={Colors.textSecondary} />
+          <Text style={styles.metaText}>
+            {formatDuration(item.totalDuration)}
+          </Text>
+        </View>
+        <View style={styles.metaItem}>
+          <Feather name="list" size={13} color={Colors.textSecondary} />
+          <Text style={styles.metaText}>
+            {item.bits.length} bit{item.bits.length !== 1 ? "s" : ""}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.bitsPreview}>
+        {item.bits.slice(0, 3).map((bit, i) => (
+          <Text key={bit.id} style={styles.bitPreviewText} numberOfLines={1}>
+            {i + 1}. {bit.title}
+          </Text>
+        ))}
+        {item.bits.length > 3 && (
+          <Text style={styles.bitPreviewMore}>
+            +{item.bits.length - 3} more
+          </Text>
+        )}
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [
+          styles.performButton,
+          pressed && styles.performButtonPressed,
+        ]}
+        onPress={handlePerform}
+      >
+        <Ionicons name="play" size={16} color={Colors.navy} />
+        <Text style={styles.performButtonText}>Perform</Text>
+      </Pressable>
+    </Pressable>
+  );
+}
+
+export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
+  const [sets, setSets] = useState<ComedySet[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webBottomInset = Platform.OS === "web" ? 34 : 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSets();
+    }, [])
+  );
+
+  const loadSets = async () => {
+    setLoading(true);
+    const data = await getSets();
+    setSets(data);
+    setLoading(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteSet(id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    loadSets();
+  };
+
+  const handleCreateNew = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push("/create-set");
+  };
+
+  const handleHistory = () => {
+    router.push("/history");
+  };
+
+  const handleBrainDrain = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push("/brain-drain");
+  };
+
+  const handlePerformSetup = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push("/perform-setup");
+  };
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + webTopInset,
+          paddingBottom: insets.bottom + webBottomInset,
+        },
+      ]}
+    >
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.appTitle}>SetFlow</Text>
+          <Text style={styles.subtitle}>Your comedy set assistant</Text>
+        </View>
+        <Pressable
+          onPress={handleHistory}
+          style={({ pressed }) => [
+            styles.historyButton,
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <Ionicons name="time-outline" size={22} color={Colors.textSecondary} />
+        </Pressable>
+      </View>
+
+      <Pressable
+        onPress={handlePerformSetup}
+        style={({ pressed }) => [
+          styles.performSetButton,
+          pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+        ]}
+      >
+        <Ionicons name="play" size={22} color={Colors.navy} />
+        <Text style={styles.performSetButtonText}>Perform Set</Text>
+      </Pressable>
+
+      <View style={styles.quickActions}>
+        <Pressable
+          onPress={handleBrainDrain}
+          style={({ pressed }) => [
+            styles.quickAction,
+            styles.quickActionBrain,
+            pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          ]}
+        >
+          <MaterialCommunityIcons name="brain" size={22} color={Colors.accent} />
+          <View style={styles.quickActionText}>
+            <Text style={styles.quickActionTitle}>Brain Drain</Text>
+            <Text style={styles.quickActionDesc}>Capture ideas</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={Colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          onPress={handleCreateNew}
+          style={({ pressed }) => [
+            styles.quickAction,
+            styles.quickActionSet,
+            pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          ]}
+        >
+          <Ionicons name="list" size={22} color={Colors.amber} />
+          <View style={styles.quickActionText}>
+            <Text style={styles.quickActionTitle}>Build a Set</Text>
+            <Text style={styles.quickActionDesc}>Create set list</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={Colors.textMuted} />
+        </Pressable>
+      </View>
+
+      {sets.length > 0 && (
+        <Text style={styles.sectionLabel}>Your Sets</Text>
+      )}
+
+      <FlatList
+        data={sets}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <SetCard item={item} onDelete={handleDelete} />
+        )}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!!sets.length}
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="mic-outline" size={48} color={Colors.textMuted} />
+              <Text style={styles.emptyTitle}>No sets yet</Text>
+              <Text style={styles.emptyText}>
+                Create your first comedy set to get started
+              </Text>
+            </View>
+          ) : null
+        }
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.navy,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  appTitle: {
+    fontSize: 28,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.amber,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  historyButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.cardBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 100,
+    gap: 14,
+  },
+  card: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(245, 166, 35, 0.08)",
+  },
+  cardPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  cardMeta: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 10,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  metaText: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+  },
+  bitsPreview: {
+    marginTop: 12,
+    gap: 4,
+  },
+  bitPreviewText: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+  },
+  bitPreviewMore: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.accent,
+    marginTop: 2,
+  },
+  performButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.amber,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 14,
+  },
+  performButtonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+  performButtonText: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.navy,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 120,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 40,
+  },
+  performSetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: Colors.amber,
+    marginHorizontal: 20,
+    marginBottom: 14,
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  performSetButtonText: {
+    fontSize: 17,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.navy,
+  },
+  quickActions: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 10,
+    marginBottom: 12,
+  },
+  quickAction: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  quickActionBrain: {
+    backgroundColor: "rgba(124, 92, 252, 0.08)",
+    borderColor: "rgba(124, 92, 252, 0.2)",
+  },
+  quickActionSet: {
+    backgroundColor: "rgba(245, 166, 35, 0.08)",
+    borderColor: "rgba(245, 166, 35, 0.2)",
+  },
+  quickActionText: {
+    flex: 1,
+  },
+  quickActionTitle: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  quickActionDesc: {
+    fontSize: 11,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textSecondary,
+    paddingHorizontal: 22,
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+});
+
+
+--------------------------------------------
+FILE: app/brain-drain.tsx
+--------------------------------------------
+import React, { useState, useCallback, useRef } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  Pressable,
+  FlatList,
+  Alert,
+  Platform,
+  KeyboardAvoidingView,
+} from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import * as Crypto from "expo-crypto";
+import Colors from "@/constants/colors";
+import type { BrainDrainNote } from "@/lib/types";
+import {
+  getBrainDrainNotes,
+  saveBrainDrainNote,
+  deleteBrainDrainNote,
+} from "@/lib/storage";
+
+const TAGS: { value: BrainDrainNote["tag"]; label: string; color: string }[] = [
+  { value: "bit-idea", label: "Bit Idea", color: Colors.amber },
+  { value: "punchline", label: "Punchline", color: "#FF6B6B" },
+  { value: "premise", label: "Premise", color: Colors.accent },
+  { value: "callback", label: "Callback", color: Colors.success },
+  { value: "general", label: "General", color: Colors.textSecondary },
+];
+
+function getTagInfo(tag: BrainDrainNote["tag"]) {
+  return TAGS.find((t) => t.value === tag) || TAGS[4];
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(ts).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function NoteCard({
+  item,
+  onDelete,
+  onEdit,
+}: {
+  item: BrainDrainNote;
+  onDelete: (id: string) => void;
+  onEdit: (note: BrainDrainNote) => void;
+}) {
+  const tagInfo = getTagInfo(item.tag);
+
+  const handleDelete = () => {
+    if (Platform.OS === "web") {
+      onDelete(item.id);
+      return;
+    }
+    Alert.alert("Delete Note", "Delete this idea?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => onDelete(item.id),
+      },
+    ]);
+  };
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.noteCard, pressed && { opacity: 0.85 }]}
+      onPress={() => onEdit(item)}
+    >
+      <View style={styles.noteTopRow}>
+        <View
+          style={[styles.tagBadge, { borderColor: `${tagInfo.color}44` }]}
+        >
+          <View
+            style={[styles.tagDot, { backgroundColor: tagInfo.color }]}
+          />
+          <Text style={[styles.tagLabel, { color: tagInfo.color }]}>
+            {tagInfo.label}
+          </Text>
+        </View>
+        <View style={styles.noteActions}>
+          <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
+          <Pressable onPress={handleDelete} hitSlop={12}>
+            <Feather name="x" size={16} color={Colors.textMuted} />
+          </Pressable>
+        </View>
+      </View>
+      <Text style={styles.noteText}>{item.text}</Text>
+    </Pressable>
+  );
+}
+
+export default function BrainDrainScreen() {
+  const insets = useSafeAreaInsets();
+  const [notes, setNotes] = useState<BrainDrainNote[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [selectedTag, setSelectedTag] =
+    useState<BrainDrainNote["tag"]>("bit-idea");
+  const [editingNote, setEditingNote] = useState<BrainDrainNote | null>(null);
+  const [filterTag, setFilterTag] = useState<BrainDrainNote["tag"] | "all">(
+    "all"
+  );
+  const inputRef = useRef<TextInput>(null);
+
+  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webBottomInset = Platform.OS === "web" ? 34 : 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNotes();
+    }, [])
+  );
+
+  const loadNotes = async () => {
+    const data = await getBrainDrainNotes();
+    setNotes(data);
+  };
+
+  const handleSave = async () => {
+    const trimmed = inputText.trim();
+    if (!trimmed) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (editingNote) {
+      const updated: BrainDrainNote = {
+        ...editingNote,
+        text: trimmed,
+        tag: selectedTag,
+      };
+      await saveBrainDrainNote(updated);
+      setEditingNote(null);
+    } else {
+      const newNote: BrainDrainNote = {
+        id: Crypto.randomUUID(),
+        text: trimmed,
+        tag: selectedTag,
+        createdAt: Date.now(),
+        usedInSetId: null,
+      };
+      await saveBrainDrainNote(newNote);
+    }
+
+    setInputText("");
+    setSelectedTag("bit-idea");
+    loadNotes();
+  };
+
+  const handleEdit = (note: BrainDrainNote) => {
+    setEditingNote(note);
+    setInputText(note.text);
+    setSelectedTag(note.tag);
+    inputRef.current?.focus();
+  };
+
+  const handleCancelEdit = () => {
+    setEditingNote(null);
+    setInputText("");
+    setSelectedTag("bit-idea");
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteBrainDrainNote(id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (editingNote?.id === id) handleCancelEdit();
+    loadNotes();
+  };
+
+  const filteredNotes =
+    filterTag === "all" ? notes : notes.filter((n) => n.tag === filterTag);
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={90}
+    >
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top + webTopInset,
+            paddingBottom: insets.bottom + webBottomInset,
+          },
+        ]}
+      >
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={Colors.textPrimary}
+            />
+          </Pressable>
+          <View style={styles.headerCenter}>
+            <MaterialCommunityIcons
+              name="brain"
+              size={22}
+              color={Colors.accent}
+            />
+            <Text style={styles.headerTitle}>Brain Drain</Text>
+          </View>
+          <View style={{ width: 24 }} />
+        </View>
+
+        <Text style={styles.headerSubtitle}>
+          Dump every idea. Sort later.
+        </Text>
+
+        <View style={styles.filterRow}>
+          <Pressable
+            onPress={() => setFilterTag("all")}
+            style={[
+              styles.filterChip,
+              filterTag === "all" && styles.filterChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                filterTag === "all" && styles.filterChipTextActive,
+              ]}
+            >
+              All ({notes.length})
+            </Text>
+          </Pressable>
+          {TAGS.map((tag) => {
+            const count = notes.filter((n) => n.tag === tag.value).length;
+            if (count === 0) return null;
+            return (
+              <Pressable
+                key={tag.value}
+                onPress={() => setFilterTag(tag.value)}
+                style={[
+                  styles.filterChip,
+                  filterTag === tag.value && {
+                    backgroundColor: `${tag.color}18`,
+                    borderColor: `${tag.color}44`,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.filterDot,
+                    { backgroundColor: tag.color },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    filterTag === tag.value && { color: tag.color },
+                  ]}
+                >
+                  {count}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <FlatList
+          data={filteredNotes}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <NoteCard
+              item={item}
+              onDelete={handleDelete}
+              onEdit={handleEdit}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!!filteredNotes.length}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons
+                name="lightbulb-outline"
+                size={48}
+                color={Colors.textMuted}
+              />
+              <Text style={styles.emptyTitle}>
+                {filterTag === "all"
+                  ? "No ideas yet"
+                  : "Nothing here"}
+              </Text>
+              <Text style={styles.emptyText}>
+                {filterTag === "all"
+                  ? "Type an idea below and hit save"
+                  : "No notes with this tag"}
+              </Text>
+            </View>
+          }
+        />
+
+        <View style={styles.inputSection}>
+          {editingNote && (
+            <Pressable onPress={handleCancelEdit} style={styles.editingBanner}>
+              <Feather name="edit-2" size={13} color={Colors.accent} />
+              <Text style={styles.editingText}>Editing note</Text>
+              <Feather name="x" size={14} color={Colors.textMuted} />
+            </Pressable>
+          )}
+
+          <View style={styles.tagSelector}>
+            {TAGS.map((tag) => (
+              <Pressable
+                key={tag.value}
+                onPress={() => {
+                  setSelectedTag(tag.value);
+                  Haptics.selectionAsync();
+                }}
+                style={[
+                  styles.tagOption,
+                  selectedTag === tag.value && {
+                    backgroundColor: `${tag.color}18`,
+                    borderColor: `${tag.color}55`,
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.tagOptionDot,
+                    { backgroundColor: tag.color },
+                    selectedTag === tag.value && {
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.tagOptionLabel,
+                    selectedTag === tag.value && { color: tag.color },
+                  ]}
+                >
+                  {tag.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.inputRow}>
+            <TextInput
+              ref={inputRef}
+              style={styles.textInput}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="What's the idea..."
+              placeholderTextColor={Colors.textMuted}
+              multiline
+              maxLength={500}
+              onSubmitEditing={handleSave}
+              blurOnSubmit={false}
+            />
+            <Pressable
+              onPress={handleSave}
+              disabled={!inputText.trim()}
+              style={({ pressed }) => [
+                styles.saveBtn,
+                !inputText.trim() && { opacity: 0.3 },
+                pressed && { transform: [{ scale: 0.92 }] },
+              ]}
+            >
+              <Ionicons
+                name={editingNote ? "checkmark" : "arrow-up"}
+                size={20}
+                color={Colors.navy}
+              />
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.navy,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  headerCenter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  filterRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 6,
+    marginBottom: 8,
+    flexWrap: "wrap",
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  filterChipActive: {
+    backgroundColor: "rgba(124, 92, 252, 0.12)",
+    borderColor: "rgba(124, 92, 252, 0.35)",
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.textMuted,
+  },
+  filterChipTextActive: {
+    color: Colors.accent,
+  },
+  filterDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    gap: 8,
+  },
+  noteCard: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  noteTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  tagBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  tagDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  tagLabel: {
+    fontSize: 11,
+    fontFamily: "SpaceGrotesk_500Medium",
+  },
+  noteActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  timeText: {
+    fontSize: 11,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+  },
+  noteText: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textPrimary,
+    lineHeight: 22,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 80,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  emptyText: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
+  inputSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+    backgroundColor: Colors.darkSurface,
+  },
+  editingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  editingText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.accent,
+  },
+  tagSelector: {
+    flexDirection: "row",
+    gap: 6,
+    paddingVertical: 10,
+    flexWrap: "wrap",
+  },
+  tagOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  tagOptionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  tagOptionLabel: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.textMuted,
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textPrimary,
+    backgroundColor: Colors.inputBg,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    maxHeight: 100,
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  saveBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: Colors.amber,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+
+--------------------------------------------
+FILE: app/create-set.tsx
+--------------------------------------------
+import React, { useState, useEffect, useRef } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  Pressable,
+  FlatList,
+  Alert,
+  Platform,
+  KeyboardAvoidingView,
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import * as Crypto from "expo-crypto";
+import Colors from "@/constants/colors";
+import type { Bit, ComedySet } from "@/lib/types";
+import { getSets, saveSet } from "@/lib/storage";
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function BitItem({
+  bit,
+  index,
+  onUpdate,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
+}: {
+  bit: Bit;
+  index: number;
+  onUpdate: (id: string, field: keyof Bit, value: string | number) => void;
+  onDelete: (id: string) => void;
+  onMoveUp: (id: string) => void;
+  onMoveDown: (id: string) => void;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
+  const [durationText, setDurationText] = useState(
+    Math.floor(bit.duration / 60).toString()
+  );
+  const [secondsText, setSecondsText] = useState(
+    (bit.duration % 60).toString()
+  );
+
+  const updateDuration = (mins: string, secs: string) => {
+    const m = parseInt(mins) || 0;
+    const s = parseInt(secs) || 0;
+    onUpdate(bit.id, "duration", m * 60 + s);
+  };
+
+  return (
+    <View style={styles.bitCard}>
+      <View style={styles.bitHeader}>
+        <View style={styles.bitIndex}>
+          <Text style={styles.bitIndexText}>{index + 1}</Text>
+        </View>
+        <TextInput
+          style={styles.bitTitleInput}
+          value={bit.title}
+          onChangeText={(text) => onUpdate(bit.id, "title", text)}
+          placeholder="Bit name"
+          placeholderTextColor={Colors.textMuted}
+        />
+        <View style={styles.bitActions}>
+          <Pressable
+            onPress={() => onMoveUp(bit.id)}
+            disabled={isFirst}
+            style={{ opacity: isFirst ? 0.3 : 1 }}
+            hitSlop={8}
+          >
+            <Feather name="chevron-up" size={18} color={Colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            onPress={() => onMoveDown(bit.id)}
+            disabled={isLast}
+            style={{ opacity: isLast ? 0.3 : 1 }}
+            hitSlop={8}
+          >
+            <Feather
+              name="chevron-down"
+              size={18}
+              color={Colors.textSecondary}
+            />
+          </Pressable>
+          <Pressable onPress={() => onDelete(bit.id)} hitSlop={8}>
+            <Feather name="x" size={18} color={Colors.danger} />
+          </Pressable>
+        </View>
+      </View>
+
+      <TextInput
+        style={styles.bitNotesInput}
+        value={bit.notes}
+        onChangeText={(text) => onUpdate(bit.id, "notes", text)}
+        placeholder="Notes, punchlines, tags..."
+        placeholderTextColor={Colors.textMuted}
+        multiline
+        numberOfLines={2}
+      />
+
+      <View style={styles.durationRow}>
+        <Feather name="clock" size={14} color={Colors.textSecondary} />
+        <TextInput
+          style={styles.durationInput}
+          value={durationText}
+          onChangeText={(text) => {
+            setDurationText(text);
+            updateDuration(text, secondsText);
+          }}
+          keyboardType="number-pad"
+          placeholder="0"
+          placeholderTextColor={Colors.textMuted}
+          maxLength={2}
+        />
+        <Text style={styles.durationLabel}>min</Text>
+        <TextInput
+          style={styles.durationInput}
+          value={secondsText}
+          onChangeText={(text) => {
+            setSecondsText(text);
+            updateDuration(durationText, text);
+          }}
+          keyboardType="number-pad"
+          placeholder="0"
+          placeholderTextColor={Colors.textMuted}
+          maxLength={2}
+        />
+        <Text style={styles.durationLabel}>sec</Text>
+      </View>
+    </View>
+  );
+}
+
+export default function CreateSetScreen() {
+  const insets = useSafeAreaInsets();
+  const { setId } = useLocalSearchParams<{ setId?: string }>();
+  const [title, setTitle] = useState("");
+  const [bits, setBits] = useState<Bit[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webBottomInset = Platform.OS === "web" ? 34 : 0;
+
+  useEffect(() => {
+    if (setId) {
+      loadExistingSet();
+    }
+  }, [setId]);
+
+  const loadExistingSet = async () => {
+    const sets = await getSets();
+    const existing = sets.find((s) => s.id === setId);
+    if (existing) {
+      setTitle(existing.title);
+      setBits(existing.bits);
+      setIsEditing(true);
+    }
+  };
+
+  const addBit = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBits((prev) => [
+      ...prev,
+      {
+        id: Crypto.randomUUID(),
+        title: "",
+        notes: "",
+        duration: 60,
+      },
+    ]);
+  };
+
+  const updateBit = (id: string, field: keyof Bit, value: string | number) => {
+    setBits((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, [field]: value } : b))
+    );
+  };
+
+  const deleteBit = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBits((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  const moveBit = (id: string, direction: "up" | "down") => {
+    setBits((prev) => {
+      const idx = prev.findIndex((b) => b.id === id);
+      if (
+        (direction === "up" && idx === 0) ||
+        (direction === "down" && idx === prev.length - 1)
+      )
+        return prev;
+      const newBits = [...prev];
+      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+      [newBits[idx], newBits[swapIdx]] = [newBits[swapIdx], newBits[idx]];
+      return newBits;
+    });
+  };
+
+  const totalDuration = bits.reduce((sum, b) => sum + b.duration, 0);
+
+  const handleSave = async () => {
+    if (!title.trim()) {
+      if (Platform.OS === "web") {
+        alert("Please enter a set title");
+      } else {
+        Alert.alert("Missing Title", "Please enter a set title");
+      }
+      return;
+    }
+    if (bits.length === 0) {
+      if (Platform.OS === "web") {
+        alert("Add at least one bit");
+      } else {
+        Alert.alert("No Bits", "Add at least one bit to your set");
+      }
+      return;
+    }
+
+    const set: ComedySet = {
+      id: setId || Crypto.randomUUID(),
+      title: title.trim(),
+      bits,
+      totalDuration,
+      createdAt: isEditing ? Date.now() : Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    await saveSet(set);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    router.back();
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={90}
+    >
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top + webTopInset,
+            paddingBottom: insets.bottom + webBottomInset,
+          },
+        ]}
+      >
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={Colors.textPrimary}
+            />
+          </Pressable>
+          <Text style={styles.headerTitle}>
+            {isEditing ? "Edit Set" : "New Set"}
+          </Text>
+          <Pressable
+            onPress={handleSave}
+            style={({ pressed }) => [
+              styles.saveButton,
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Feather name="check" size={20} color={Colors.navy} />
+          </Pressable>
+        </View>
+
+        <View style={styles.titleSection}>
+          <TextInput
+            style={styles.titleInput}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Set title"
+            placeholderTextColor={Colors.textMuted}
+          />
+          <View style={styles.totalDuration}>
+            <Feather name="clock" size={14} color={Colors.amber} />
+            <Text style={styles.totalDurationText}>
+              Total: {formatDuration(totalDuration)}
+            </Text>
+          </View>
+        </View>
+
+        <FlatList
+          data={bits}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item, index }) => (
+            <BitItem
+              bit={item}
+              index={index}
+              onUpdate={updateBit}
+              onDelete={deleteBit}
+              onMoveUp={(id) => moveBit(id, "up")}
+              onMoveDown={(id) => moveBit(id, "down")}
+              isFirst={index === 0}
+              isLast={index === bits.length - 1}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={!!bits.length}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          ListFooterComponent={
+            <Pressable
+              style={({ pressed }) => [
+                styles.addBitButton,
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={addBit}
+            >
+              <Ionicons name="add" size={20} color={Colors.amber} />
+              <Text style={styles.addBitText}>Add Bit</Text>
+            </Pressable>
+          }
+        />
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.navy,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  saveButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.amber,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  titleSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+  titleInput: {
+    fontSize: 24,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.textPrimary,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(245, 166, 35, 0.2)",
+    paddingBottom: 8,
+  },
+  totalDuration: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+  },
+  totalDurationText: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.amber,
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    gap: 10,
+  },
+  bitCard: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  bitHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  bitIndex: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.amber,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bitIndexText: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.navy,
+  },
+  bitTitleInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.textPrimary,
+    paddingVertical: 4,
+  },
+  bitActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  bitNotesInput: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 8,
+    paddingVertical: 4,
+    minHeight: 36,
+  },
+  durationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.05)",
+  },
+  durationInput: {
+    width: 36,
+    textAlign: "center",
+    fontSize: 14,
+    fontFamily: "JetBrainsMono_400Regular",
+    color: Colors.textPrimary,
+    backgroundColor: Colors.inputBg,
+    borderRadius: 6,
+    paddingVertical: 4,
+  },
+  durationLabel: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+  },
+  addBitButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(245, 166, 35, 0.3)",
+    borderStyle: "dashed",
+    marginTop: 4,
+  },
+  addBitText: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.amber,
+  },
+});
+
+
+--------------------------------------------
+FILE: app/perform-setup.tsx
+--------------------------------------------
+import React, { useState, useCallback } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  Platform,
+  ScrollView,
+} from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import Colors from "@/constants/colors";
+import type { ComedySet } from "@/lib/types";
+import { getSets } from "@/lib/storage";
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+export default function PerformSetupScreen() {
+  const insets = useSafeAreaInsets();
+  const [sets, setSets] = useState<ComedySet[]>([]);
+  const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
+  const [startBitIndex, setStartBitIndex] = useState(0);
+  const [recordingMode, setRecordingMode] = useState<"audio" | "video" | "none">("audio");
+
+  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webBottomInset = Platform.OS === "web" ? 34 : 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSets();
+    }, [])
+  );
+
+  const loadSets = async () => {
+    const data = await getSets();
+    setSets(data);
+    if (data.length > 0 && !selectedSetId) {
+      setSelectedSetId(data[0].id);
+    }
+  };
+
+  const selectedSet = sets.find((s) => s.id === selectedSetId) || null;
+
+  const handleSelectSet = (id: string) => {
+    Haptics.selectionAsync();
+    setSelectedSetId(id);
+    setStartBitIndex(0);
+  };
+
+  const handleStartPerformance = () => {
+    if (!selectedSet) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    router.push({
+      pathname: "/perform",
+      params: {
+        setId: selectedSet.id,
+        startBit: startBitIndex.toString(),
+        recMode: recordingMode,
+      },
+    });
+  };
+
+  const handleCreateSet = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push("/create-set");
+  };
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + webTopInset,
+          paddingBottom: insets.bottom + webBottomInset,
+        },
+      ]}
+    >
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Perform Set</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.sectionLabel}>Select a Set</Text>
+
+        {sets.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="mic-outline" size={36} color={Colors.textMuted} />
+            <Text style={styles.emptyText}>No sets yet</Text>
+            <Pressable
+              onPress={handleCreateSet}
+              style={({ pressed }) => [
+                styles.createSetBtn,
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <Ionicons name="add" size={18} color={Colors.navy} />
+              <Text style={styles.createSetBtnText}>Create a Set</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            {sets.map((set) => {
+              const isSelected = set.id === selectedSetId;
+              return (
+                <Pressable
+                  key={set.id}
+                  onPress={() => handleSelectSet(set.id)}
+                  style={[
+                    styles.setOption,
+                    isSelected && styles.setOptionSelected,
+                  ]}
+                >
+                  <View style={styles.setOptionLeft}>
+                    <View
+                      style={[
+                        styles.radioOuter,
+                        isSelected && styles.radioOuterSelected,
+                      ]}
+                    >
+                      {isSelected && <View style={styles.radioInner} />}
+                    </View>
+                    <View style={styles.setOptionInfo}>
+                      <Text
+                        style={[
+                          styles.setOptionTitle,
+                          isSelected && { color: Colors.amber },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {set.title}
+                      </Text>
+                      <Text style={styles.setOptionMeta}>
+                        {formatDuration(set.totalDuration)} · {set.bits.length} bit
+                        {set.bits.length !== 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                  </View>
+                  <Feather
+                    name="chevron-right"
+                    size={16}
+                    color={isSelected ? Colors.amber : Colors.textMuted}
+                  />
+                </Pressable>
+              );
+            })}
+
+            <Pressable
+              onPress={handleCreateSet}
+              style={({ pressed }) => [
+                styles.addSetRow,
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <Ionicons name="add-circle-outline" size={20} color={Colors.accent} />
+              <Text style={styles.addSetText}>Create New Set</Text>
+            </Pressable>
+          </>
+        )}
+
+        {selectedSet && selectedSet.bits.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { marginTop: 28 }]}>
+              Start From
+            </Text>
+            <View style={styles.bitsContainer}>
+              {selectedSet.bits.map((bit, index) => {
+                const isStart = index === startBitIndex;
+                return (
+                  <Pressable
+                    key={bit.id}
+                    onPress={() => {
+                      setStartBitIndex(index);
+                      Haptics.selectionAsync();
+                    }}
+                    style={[
+                      styles.bitOption,
+                      isStart && styles.bitOptionActive,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.bitNumber,
+                        isStart && styles.bitNumberActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.bitNumberText,
+                          isStart && { color: Colors.navy },
+                        ]}
+                      >
+                        {index + 1}
+                      </Text>
+                    </View>
+                    <View style={styles.bitOptionInfo}>
+                      <Text
+                        style={[
+                          styles.bitOptionTitle,
+                          isStart && { color: Colors.amber },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {bit.title || `Bit ${index + 1}`}
+                      </Text>
+                      <Text style={styles.bitOptionDuration}>
+                        {formatDuration(bit.duration)}
+                      </Text>
+                    </View>
+                    {isStart && (
+                      <View style={styles.startBadge}>
+                        <Text style={styles.startBadgeText}>START</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        <Text style={[styles.sectionLabel, { marginTop: 28 }]}>
+          Recording
+        </Text>
+        <View style={styles.recordingOptions}>
+          <Pressable
+            onPress={() => {
+              setRecordingMode("audio");
+              Haptics.selectionAsync();
+            }}
+            style={[
+              styles.recOption,
+              recordingMode === "audio" && styles.recOptionActive,
+            ]}
+          >
+            <View
+              style={[
+                styles.recIconWrap,
+                recordingMode === "audio" && styles.recIconWrapActive,
+              ]}
+            >
+              <Ionicons
+                name="mic"
+                size={22}
+                color={recordingMode === "audio" ? Colors.navy : Colors.textSecondary}
+              />
+            </View>
+            <Text
+              style={[
+                styles.recOptionLabel,
+                recordingMode === "audio" && { color: Colors.amber },
+              ]}
+            >
+              Audio
+            </Text>
+            <Text style={styles.recOptionDesc}>Record audio only</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              setRecordingMode("video");
+              Haptics.selectionAsync();
+            }}
+            style={[
+              styles.recOption,
+              recordingMode === "video" && styles.recOptionActive,
+            ]}
+          >
+            <View
+              style={[
+                styles.recIconWrap,
+                recordingMode === "video" && styles.recIconWrapActive,
+              ]}
+            >
+              <Ionicons
+                name="videocam"
+                size={22}
+                color={recordingMode === "video" ? Colors.navy : Colors.textSecondary}
+              />
+            </View>
+            <Text
+              style={[
+                styles.recOptionLabel,
+                recordingMode === "video" && { color: Colors.amber },
+              ]}
+            >
+              Video
+            </Text>
+            <Text style={styles.recOptionDesc}>Record video & audio</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              setRecordingMode("none");
+              Haptics.selectionAsync();
+            }}
+            style={[
+              styles.recOption,
+              recordingMode === "none" && styles.recOptionActive,
+            ]}
+          >
+            <View
+              style={[
+                styles.recIconWrap,
+                recordingMode === "none" && styles.recIconWrapActive,
+              ]}
+            >
+              <Feather
+                name="mic-off"
+                size={20}
+                color={recordingMode === "none" ? Colors.navy : Colors.textSecondary}
+              />
+            </View>
+            <Text
+              style={[
+                styles.recOptionLabel,
+                recordingMode === "none" && { color: Colors.amber },
+              ]}
+            >
+              None
+            </Text>
+            <Text style={styles.recOptionDesc}>Timer & notes only</Text>
+          </Pressable>
+        </View>
+
+        {selectedSet && (
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Set</Text>
+              <Text style={styles.summaryValue} numberOfLines={1}>
+                {selectedSet.title}
+              </Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Starting at</Text>
+              <Text style={styles.summaryValue}>
+                Bit {startBitIndex + 1}
+                {selectedSet.bits[startBitIndex]?.title
+                  ? ` — ${selectedSet.bits[startBitIndex].title}`
+                  : ""}
+              </Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Recording</Text>
+              <Text style={styles.summaryValue}>
+                {recordingMode === "audio"
+                  ? "Audio"
+                  : recordingMode === "video"
+                    ? "Video"
+                    : "Off"}
+              </Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Duration</Text>
+              <Text style={styles.summaryValue}>
+                {formatDuration(
+                  selectedSet.bits
+                    .slice(startBitIndex)
+                    .reduce((sum, b) => sum + b.duration, 0)
+                )}
+              </Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      <View style={styles.bottomBar}>
+        <Pressable
+          onPress={handleStartPerformance}
+          disabled={!selectedSet}
+          style={({ pressed }) => [
+            styles.goButton,
+            pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
+            !selectedSet && { opacity: 0.35 },
+          ]}
+        >
+          <Ionicons name="play" size={22} color={Colors.navy} />
+          <Text style={styles.goButtonText}>Start Performance</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.navy,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  scrollArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 40,
+    gap: 10,
+  },
+  emptyText: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+  },
+  createSetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.amber,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  createSetBtnText: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.navy,
+  },
+  setOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.cardBg,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  setOptionSelected: {
+    borderColor: "rgba(245, 166, 35, 0.35)",
+    backgroundColor: "rgba(245, 166, 35, 0.06)",
+  },
+  setOptionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioOuterSelected: {
+    borderColor: Colors.amber,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.amber,
+  },
+  setOptionInfo: {
+    flex: 1,
+  },
+  setOptionTitle: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  setOptionMeta: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  addSetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  addSetText: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.accent,
+  },
+  bitsContainer: {
+    gap: 6,
+  },
+  bitOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.cardBg,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.04)",
+  },
+  bitOptionActive: {
+    borderColor: "rgba(245, 166, 35, 0.3)",
+    backgroundColor: "rgba(245, 166, 35, 0.05)",
+  },
+  bitNumber: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bitNumberActive: {
+    backgroundColor: Colors.amber,
+  },
+  bitNumberText: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.textSecondary,
+  },
+  bitOptionInfo: {
+    flex: 1,
+  },
+  bitOptionTitle: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.textPrimary,
+  },
+  bitOptionDuration: {
+    fontSize: 11,
+    fontFamily: "JetBrainsMono_400Regular",
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  startBadge: {
+    backgroundColor: "rgba(245, 166, 35, 0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  startBadgeText: {
+    fontSize: 10,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.amber,
+    letterSpacing: 0.5,
+  },
+  recordingOptions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  recOption: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: Colors.cardBg,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+    gap: 6,
+  },
+  recOptionActive: {
+    borderColor: "rgba(245, 166, 35, 0.35)",
+    backgroundColor: "rgba(245, 166, 35, 0.06)",
+  },
+  recIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  recIconWrapActive: {
+    backgroundColor: Colors.amber,
+  },
+  recOptionLabel: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  recOptionDesc: {
+    fontSize: 11,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+    textAlign: "center",
+  },
+  summaryCard: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+  },
+  summaryValue: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+    flex: 1,
+    textAlign: "right",
+    marginLeft: 16,
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  bottomBar: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.04)",
+    backgroundColor: Colors.darkSurface,
+  },
+  goButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: Colors.amber,
+    borderRadius: 14,
+    paddingVertical: 16,
+  },
+  goButtonText: {
+    fontSize: 17,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.navy,
+  },
+});
+
+
+--------------------------------------------
+FILE: app/perform.tsx
+--------------------------------------------
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  Platform,
+  FlatList,
+  Dimensions,
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import * as Crypto from "expo-crypto";
+import { useAudioRecorder, AudioModule, RecordingPresets } from "expo-audio";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withRepeat,
+  Easing,
+  cancelAnimation,
+} from "react-native-reanimated";
+import Colors from "@/constants/colors";
+import type { Bit, ComedySet, Performance } from "@/lib/types";
+import { getSets, savePerformance } from "@/lib/storage";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(Math.abs(seconds) / 60);
+  const s = Math.abs(seconds) % 60;
+  const prefix = seconds < 0 ? "-" : "";
+  return `${prefix}${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+function BitNoteCard({
+  bit,
+  index,
+  isActive,
+  isPast,
+  bitTimeRemaining,
+}: {
+  bit: Bit;
+  index: number;
+  isActive: boolean;
+  isPast: boolean;
+  bitTimeRemaining: number;
+}) {
+  const animatedBg = useAnimatedStyle(() => ({
+    backgroundColor: isActive
+      ? withTiming("rgba(245, 166, 35, 0.15)", { duration: 300 })
+      : isPast
+        ? withTiming("rgba(255,255,255,0.03)", { duration: 300 })
+        : withTiming("rgba(255,255,255,0.06)", { duration: 300 }),
+    borderColor: isActive
+      ? withTiming("rgba(245, 166, 35, 0.5)", { duration: 300 })
+      : withTiming("rgba(255,255,255,0.08)", { duration: 300 }),
+    opacity: withTiming(isPast ? 0.5 : 1, { duration: 300 }),
+  }));
+
+  return (
+    <Animated.View style={[styles.noteCard, animatedBg]}>
+      <View style={styles.noteHeader}>
+        <View
+          style={[
+            styles.noteIndex,
+            isActive && { backgroundColor: Colors.amber },
+          ]}
+        >
+          {isPast ? (
+            <Ionicons name="checkmark" size={12} color={Colors.navy} />
+          ) : (
+            <Text
+              style={[
+                styles.noteIndexText,
+                isActive && { color: Colors.navy },
+              ]}
+            >
+              {index + 1}
+            </Text>
+          )}
+        </View>
+        <Text
+          style={[
+            styles.noteTitle,
+            isActive && { color: Colors.amber },
+          ]}
+          numberOfLines={1}
+        >
+          {bit.title || `Bit ${index + 1}`}
+        </Text>
+        {isActive && (
+          <View style={styles.activeTimeBadge}>
+            <Text style={styles.activeTimeText}>
+              {formatTime(bitTimeRemaining)}
+            </Text>
+          </View>
+        )}
+      </View>
+      {!!bit.notes && (
+        <Text
+          style={[styles.noteText, isActive && { color: Colors.textPrimary }]}
+          numberOfLines={isActive ? undefined : 2}
+        >
+          {bit.notes}
+        </Text>
+      )}
+    </Animated.View>
+  );
+}
+
+export default function PerformScreen() {
+  const insets = useSafeAreaInsets();
+  const { setId, startBit, recMode } = useLocalSearchParams<{
+    setId: string;
+    startBit?: string;
+    recMode?: string;
+  }>();
+  const startBitIndex = parseInt(startBit || "0") || 0;
+  const recordingMode = (recMode || "audio") as "audio" | "video" | "none";
+
+  const [comedySet, setComedySet] = useState<ComedySet | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [currentBitIndex, setCurrentBitIndex] = useState(startBitIndex);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingUri, setRecordingUri] = useState<string | null>(null);
+  const [hasFinished, setHasFinished] = useState(false);
+  const [manualBitOverride, setManualBitOverride] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const flatListRef = useRef<FlatList>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+
+  const pulseAnim = useSharedValue(1);
+
+  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webBottomInset = Platform.OS === "web" ? 34 : 0;
+
+  useEffect(() => {
+    loadSet();
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [setId]);
+
+  const loadSet = async () => {
+    const sets = await getSets();
+    const found = sets.find((s) => s.id === setId);
+    if (found) {
+      setComedySet(found);
+      if (startBitIndex > 0) {
+        const skipTime = found.bits
+          .slice(0, startBitIndex)
+          .reduce((sum, b) => sum + b.duration, 0);
+        setElapsed(skipTime);
+      }
+    }
+  };
+
+  const getCumulativeTime = useCallback(
+    (bitIndex: number): number => {
+      if (!comedySet) return 0;
+      return comedySet.bits
+        .slice(0, bitIndex + 1)
+        .reduce((sum, b) => sum + b.duration, 0);
+    },
+    [comedySet]
+  );
+
+  const getCurrentBitFromElapsed = useCallback(
+    (elapsedSec: number): number => {
+      if (!comedySet) return 0;
+      let acc = 0;
+      for (let i = 0; i < comedySet.bits.length; i++) {
+        acc += comedySet.bits[i].duration;
+        if (elapsedSec < acc) return i;
+      }
+      return comedySet.bits.length - 1;
+    },
+    [comedySet]
+  );
+
+  useEffect(() => {
+    if (isRunning && comedySet && !manualBitOverride) {
+      const autoBitIndex = getCurrentBitFromElapsed(elapsed);
+      if (autoBitIndex !== currentBitIndex) {
+        setCurrentBitIndex(autoBitIndex);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        flatListRef.current?.scrollToIndex({
+          index: autoBitIndex,
+          animated: true,
+          viewPosition: 0.3,
+        });
+      }
+    }
+  }, [elapsed, isRunning, comedySet, getCurrentBitFromElapsed, currentBitIndex, manualBitOverride]);
+
+  const startTimer = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setIsRunning(true);
+    startTimeRef.current = Date.now() - elapsed * 1000;
+
+    pulseAnim.value = withRepeat(
+      withTiming(1.05, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+
+    intervalRef.current = setInterval(() => {
+      const newElapsed = Math.floor(
+        (Date.now() - startTimeRef.current) / 1000
+      );
+      setElapsed(newElapsed);
+    }, 200);
+  };
+
+  const pauseTimer = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsRunning(false);
+    cancelAnimation(pulseAnim);
+    pulseAnim.value = withTiming(1, { duration: 200 });
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const finishSet = async () => {
+    pauseTimer();
+    setHasFinished(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    let finalRecordingUri = recordingUri;
+    if (isRecording) {
+      try {
+        await audioRecorder.stop();
+        finalRecordingUri = audioRecorder.uri || null;
+        setRecordingUri(finalRecordingUri);
+        setIsRecording(false);
+      } catch (e) {
+        console.error("Error stopping recording:", e);
+      }
+    }
+
+    if (!comedySet) return;
+
+    const perf: Performance = {
+      id: Crypto.randomUUID(),
+      setId: comedySet.id,
+      setTitle: comedySet.title,
+      bits: comedySet.bits,
+      actualDuration: elapsed,
+      plannedDuration: comedySet.totalDuration,
+      recordingUri: finalRecordingUri || null,
+      feedback: null,
+      notes: null,
+      performedAt: Date.now(),
+    };
+
+    await savePerformance(perf);
+
+    router.push({
+      pathname: "/feedback",
+      params: { performanceId: perf.id },
+    });
+  };
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      try {
+        await audioRecorder.stop();
+        setRecordingUri(audioRecorder.uri || null);
+        setIsRecording(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (e) {
+        console.error("Error stopping recording:", e);
+      }
+      return;
+    }
+
+    try {
+      const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (!status.granted) {
+        return;
+      }
+
+      audioRecorder.record();
+      setIsRecording(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } catch (e) {
+      console.error("Error starting recording:", e);
+    }
+  };
+
+  const skipBit = (direction: "next" | "prev") => {
+    if (!comedySet) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setManualBitOverride(true);
+    const newIndex =
+      direction === "next"
+        ? Math.min(currentBitIndex + 1, comedySet.bits.length - 1)
+        : Math.max(currentBitIndex - 1, 0);
+    setCurrentBitIndex(newIndex);
+    flatListRef.current?.scrollToIndex({
+      index: newIndex,
+      animated: true,
+      viewPosition: 0.3,
+    });
+    setTimeout(() => setManualBitOverride(false), 5000);
+  };
+
+  const timerPulse = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+  }));
+
+  if (!comedySet) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+        <Text style={styles.loadingText}>Loading set...</Text>
+      </View>
+    );
+  }
+
+  const totalDuration = comedySet.totalDuration;
+  const remaining = totalDuration - elapsed;
+  const progress = Math.min(elapsed / totalDuration, 1);
+  const isOvertime = remaining < 0;
+
+  const currentBitEndTime = getCumulativeTime(currentBitIndex);
+  const currentBitStartTime =
+    currentBitIndex > 0 ? getCumulativeTime(currentBitIndex - 1) : 0;
+  const bitTimeRemaining = currentBitEndTime - elapsed;
+  const bitProgress = Math.min(
+    (elapsed - currentBitStartTime) /
+      (comedySet.bits[currentBitIndex]?.duration || 1),
+    1
+  );
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + webTopInset,
+          paddingBottom: insets.bottom + webBottomInset,
+        },
+      ]}
+    >
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={Colors.textSecondary} />
+        </Pressable>
+        <Text style={styles.setTitleSmall} numberOfLines={1}>
+          {comedySet.title}
+        </Text>
+        {recordingMode !== "none" ? (
+          <Pressable
+            onPress={toggleRecording}
+            style={({ pressed }) => [
+              styles.recButton,
+              isRecording && styles.recButtonActive,
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={
+                isRecording
+                  ? "stop"
+                  : recordingMode === "video"
+                    ? "video"
+                    : "microphone"
+              }
+              size={20}
+              color={isRecording ? "#fff" : Colors.danger}
+            />
+          </Pressable>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
+      </View>
+
+      <View style={styles.timerSection}>
+        <View style={styles.progressBarOuter}>
+          <View
+            style={[
+              styles.progressBarInner,
+              {
+                width: `${progress * 100}%`,
+                backgroundColor: isOvertime ? Colors.danger : Colors.amber,
+              },
+            ]}
+          />
+        </View>
+
+        <Animated.View style={[styles.timerContainer, timerPulse]}>
+          <Text
+            style={[styles.timerText, isOvertime && { color: Colors.danger }]}
+          >
+            {formatTime(remaining)}
+          </Text>
+        </Animated.View>
+
+        <Text style={styles.elapsedLabel}>
+          {formatTime(elapsed)} elapsed of {formatTime(totalDuration)}
+        </Text>
+
+        {isRecording && (
+          <View style={styles.recordingIndicator}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingLabel}>Recording</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.controlsRow}>
+        <Pressable
+          onPress={() => skipBit("prev")}
+          disabled={currentBitIndex === 0}
+          style={({ pressed }) => [
+            styles.skipButton,
+            pressed && { opacity: 0.7 },
+            currentBitIndex === 0 && { opacity: 0.3 },
+          ]}
+        >
+          <Ionicons
+            name="play-skip-back"
+            size={22}
+            color={Colors.textSecondary}
+          />
+        </Pressable>
+
+        {!isRunning && !hasFinished ? (
+          <Pressable
+            onPress={startTimer}
+            style={({ pressed }) => [
+              styles.playButton,
+              pressed && { transform: [{ scale: 0.95 }] },
+            ]}
+          >
+            <Ionicons name="play" size={32} color={Colors.navy} />
+          </Pressable>
+        ) : !hasFinished ? (
+          <Pressable
+            onPress={pauseTimer}
+            style={({ pressed }) => [
+              styles.pauseButton,
+              pressed && { transform: [{ scale: 0.95 }] },
+            ]}
+          >
+            <Ionicons name="pause" size={32} color={Colors.amber} />
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          onPress={() => skipBit("next")}
+          disabled={currentBitIndex === comedySet.bits.length - 1}
+          style={({ pressed }) => [
+            styles.skipButton,
+            pressed && { opacity: 0.7 },
+            currentBitIndex === comedySet.bits.length - 1 && { opacity: 0.3 },
+          ]}
+        >
+          <Ionicons
+            name="play-skip-forward"
+            size={22}
+            color={Colors.textSecondary}
+          />
+        </Pressable>
+      </View>
+
+      {(isRunning || elapsed > 0) && !hasFinished && (
+        <Pressable
+          onPress={finishSet}
+          style={({ pressed }) => [
+            styles.finishButton,
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <Ionicons name="flag" size={16} color={Colors.danger} />
+          <Text style={styles.finishText}>End Set</Text>
+        </Pressable>
+      )}
+
+      <View style={styles.currentBitBanner}>
+        <View style={styles.bitProgressBarOuter}>
+          <View
+            style={[
+              styles.bitProgressBarInner,
+              { width: `${bitProgress * 100}%` },
+            ]}
+          />
+        </View>
+        <Text style={styles.currentBitLabel}>
+          Bit {currentBitIndex + 1}/{comedySet.bits.length}
+        </Text>
+      </View>
+
+      <FlatList
+        ref={flatListRef}
+        data={comedySet.bits}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item, index }) => (
+          <BitNoteCard
+            bit={item}
+            index={index}
+            isActive={index === currentBitIndex}
+            isPast={index < currentBitIndex}
+            bitTimeRemaining={
+              index === currentBitIndex ? bitTimeRemaining : item.duration
+            }
+          />
+        )}
+        contentContainerStyle={styles.notesList}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!!comedySet.bits.length}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index: info.index,
+              animated: true,
+              viewPosition: 0.3,
+            });
+          }, 100);
+        }}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.navy,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 100,
+  },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  setTitleSmall: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.textSecondary,
+    flex: 1,
+    textAlign: "center",
+    marginHorizontal: 12,
+  },
+  recButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 71, 87, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recButtonActive: {
+    backgroundColor: Colors.danger,
+  },
+  timerSection: {
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+  },
+  progressBarOuter: {
+    width: "100%",
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 2,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  progressBarInner: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  timerContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timerText: {
+    fontSize: 72,
+    fontFamily: "JetBrainsMono_700Bold",
+    color: Colors.textPrimary,
+    letterSpacing: -2,
+    lineHeight: 80,
+  },
+  elapsedLabel: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  recordingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.danger,
+  },
+  recordingLabel: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.danger,
+  },
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 28,
+    paddingVertical: 12,
+  },
+  skipButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.cardBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  playButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: Colors.amber,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 4,
+  },
+  pauseButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "rgba(245, 166, 35, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: Colors.amber,
+  },
+  finishButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    alignSelf: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 71, 87, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 71, 87, 0.3)",
+  },
+  finishText: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.danger,
+  },
+  currentBitBanner: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  bitProgressBarOuter: {
+    width: "100%",
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 1.5,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  bitProgressBarInner: {
+    height: "100%",
+    backgroundColor: Colors.accent,
+    borderRadius: 1.5,
+  },
+  currentBitLabel: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.textMuted,
+  },
+  notesList: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    gap: 8,
+  },
+  noteCard: {
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+  },
+  noteHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  noteIndex: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noteIndexText: {
+    fontSize: 11,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.textSecondary,
+  },
+  noteTitle: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  activeTimeBadge: {
+    backgroundColor: "rgba(245, 166, 35, 0.2)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  activeTimeText: {
+    fontSize: 12,
+    fontFamily: "JetBrainsMono_700Bold",
+    color: Colors.amber,
+  },
+  noteText: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 6,
+    lineHeight: 19,
+  },
+});
+
+
+--------------------------------------------
+FILE: app/feedback.tsx
+--------------------------------------------
+import React, { useState, useEffect } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import { useAudioPlayer } from "expo-audio";
+import Colors from "@/constants/colors";
+import type { Performance } from "@/lib/types";
+import { getPerformances, savePerformance } from "@/lib/storage";
+import { apiRequest } from "@/lib/query-client";
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function MarkdownText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <View style={mdStyles.container}>
+      {lines.map((line, i) => {
+        if (line.startsWith("**") && line.endsWith("**")) {
+          return (
+            <Text key={i} style={mdStyles.heading}>
+              {line.replace(/\*\*/g, "")}
+            </Text>
+          );
+        }
+        if (line.startsWith("- ")) {
+          return (
+            <View key={i} style={mdStyles.bulletRow}>
+              <View style={mdStyles.bullet} />
+              <Text style={mdStyles.bodyText}>{line.slice(2)}</Text>
+            </View>
+          );
+        }
+        if (line.trim() === "") {
+          return <View key={i} style={{ height: 8 }} />;
+        }
+        const parts = line.split(/(\*\*[^*]+\*\*)/g);
+        return (
+          <Text key={i} style={mdStyles.bodyText}>
+            {parts.map((part, j) =>
+              part.startsWith("**") && part.endsWith("**") ? (
+                <Text key={j} style={mdStyles.bold}>
+                  {part.replace(/\*\*/g, "")}
+                </Text>
+              ) : (
+                part
+              )
+            )}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
+export default function FeedbackScreen() {
+  const insets = useSafeAreaInsets();
+  const { performanceId } = useLocalSearchParams<{ performanceId: string }>();
+  const [performance, setPerformance] = useState<Performance | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [postNotes, setPostNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playerSource, setPlayerSource] = useState<string | null>(null);
+  const player = useAudioPlayer(playerSource);
+
+  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webBottomInset = Platform.OS === "web" ? 34 : 0;
+
+  useEffect(() => {
+    loadPerformance();
+  }, [performanceId]);
+
+  useEffect(() => {
+    if (player) {
+      player.addListener("playbackStatusUpdate", (status: any) => {
+        if (status.playing !== undefined) {
+          setIsPlaying(status.playing);
+        }
+      });
+    }
+  }, [player]);
+
+  const loadPerformance = async () => {
+    const perfs = await getPerformances();
+    const found = perfs.find((p) => p.id === performanceId);
+    if (found) {
+      setPerformance(found);
+      if (found.feedback) setFeedback(found.feedback);
+      if (found.notes) setPostNotes(found.notes);
+    }
+  };
+
+  const requestFeedback = async () => {
+    if (!performance) return;
+    setLoading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const res = await apiRequest("POST", "/api/feedback", {
+        setTitle: performance.setTitle,
+        bits: performance.bits,
+        totalDuration: performance.plannedDuration,
+        actualDuration: performance.actualDuration,
+        notes: postNotes || null,
+      });
+
+      const data = await res.json();
+      setFeedback(data.feedback);
+
+      const updated: Performance = {
+        ...performance,
+        feedback: data.feedback,
+        notes: postNotes || null,
+      };
+      await savePerformance(updated);
+      setPerformance(updated);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error("Feedback error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const playRecording = () => {
+    if (!performance?.recordingUri) return;
+
+    if (!playerSource) {
+      setPlayerSource(performance.recordingUri);
+      setTimeout(() => {
+        player?.play();
+        setIsPlaying(true);
+      }, 100);
+      return;
+    }
+
+    if (isPlaying) {
+      player?.pause();
+      setIsPlaying(false);
+    } else {
+      player?.play();
+      setIsPlaying(true);
+    }
+  };
+
+  const handleDone = () => {
+    router.dismissAll();
+    router.replace("/");
+  };
+
+  if (!performance) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+        <ActivityIndicator color={Colors.amber} size="large" />
+      </View>
+    );
+  }
+
+  const timeDiff = performance.actualDuration - performance.plannedDuration;
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + webTopInset,
+          paddingBottom: insets.bottom + webBottomInset,
+        },
+      ]}
+    >
+      <View style={styles.header}>
+        <Pressable onPress={handleDone} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Post-Set Review</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>{performance.setTitle}</Text>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {formatTime(performance.actualDuration)}
+              </Text>
+              <Text style={styles.statLabel}>Actual</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {formatTime(performance.plannedDuration)}
+              </Text>
+              <Text style={styles.statLabel}>Planned</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text
+                style={[
+                  styles.statValue,
+                  {
+                    color:
+                      Math.abs(timeDiff) <= 30
+                        ? Colors.success
+                        : Colors.danger,
+                  },
+                ]}
+              >
+                {timeDiff > 0 ? "+" : ""}
+                {formatTime(timeDiff)}
+              </Text>
+              <Text style={styles.statLabel}>Diff</Text>
+            </View>
+          </View>
+        </View>
+
+        {performance.recordingUri && (
+          <Pressable
+            onPress={playRecording}
+            style={({ pressed }) => [
+              styles.playbackCard,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Ionicons
+              name={isPlaying ? "pause" : "play"}
+              size={22}
+              color={Colors.amber}
+            />
+            <Text style={styles.playbackText}>
+              {isPlaying ? "Pause Recording" : "Play Recording"}
+            </Text>
+          </Pressable>
+        )}
+
+        <View style={styles.notesSection}>
+          <Text style={styles.sectionTitle}>Post-Show Notes</Text>
+          <TextInput
+            style={styles.notesInput}
+            value={postNotes}
+            onChangeText={setPostNotes}
+            placeholder="How did it go? Any crowd reactions, bits that killed or bombed..."
+            placeholderTextColor={Colors.textMuted}
+            multiline
+            numberOfLines={4}
+          />
+        </View>
+
+        {!feedback && (
+          <Pressable
+            onPress={requestFeedback}
+            disabled={loading}
+            style={({ pressed }) => [
+              styles.feedbackButton,
+              pressed && { opacity: 0.85 },
+              loading && { opacity: 0.6 },
+            ]}
+          >
+            {loading ? (
+              <ActivityIndicator color={Colors.navy} size="small" />
+            ) : (
+              <>
+                <Ionicons name="sparkles" size={18} color={Colors.navy} />
+                <Text style={styles.feedbackButtonText}>
+                  Get AI Feedback
+                </Text>
+              </>
+            )}
+          </Pressable>
+        )}
+
+        {feedback && (
+          <View style={styles.feedbackCard}>
+            <View style={styles.feedbackHeader}>
+              <Ionicons name="sparkles" size={18} color={Colors.accent} />
+              <Text style={styles.feedbackTitle}>AI Coach Feedback</Text>
+            </View>
+            <MarkdownText text={feedback} />
+
+            <Pressable
+              onPress={requestFeedback}
+              disabled={loading}
+              style={({ pressed }) => [
+                styles.regenerateButton,
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              {loading ? (
+                <ActivityIndicator color={Colors.accent} size="small" />
+              ) : (
+                <>
+                  <Feather name="refresh-cw" size={14} color={Colors.accent} />
+                  <Text style={styles.regenerateText}>Regenerate</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        )}
+
+        <Pressable
+          onPress={handleDone}
+          style={({ pressed }) => [
+            styles.doneButton,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={styles.doneButtonText}>Back to Sets</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
+const mdStyles = StyleSheet.create({
+  container: { gap: 2 },
+  heading: {
+    fontSize: 16,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.textPrimary,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  bodyText: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+    lineHeight: 21,
+  },
+  bold: {
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  bulletRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingLeft: 4,
+  },
+  bullet: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.accent,
+    marginTop: 8,
+  },
+});
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.navy,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    gap: 16,
+  },
+  summaryCard: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(245, 166, 35, 0.12)",
+  },
+  summaryTitle: {
+    fontSize: 20,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: Colors.textPrimary,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  statItem: {
+    alignItems: "center",
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 22,
+    fontFamily: "JetBrainsMono_700Bold",
+    color: Colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  playbackCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.cardBg,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(245, 166, 35, 0.15)",
+  },
+  playbackText: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.amber,
+  },
+  notesSection: {
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  notesInput: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textPrimary,
+    minHeight: 80,
+    textAlignVertical: "top",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  feedbackButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.amber,
+    borderRadius: 12,
+    paddingVertical: 16,
+  },
+  feedbackButtonText: {
+    fontSize: 16,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.navy,
+  },
+  feedbackCard: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(124, 92, 252, 0.2)",
+  },
+  feedbackHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  feedbackTitle: {
+    fontSize: 16,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.accent,
+  },
+  regenerateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(124, 92, 252, 0.3)",
+  },
+  regenerateText: {
+    fontSize: 13,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.accent,
+  },
+  doneButton: {
+    alignItems: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: Colors.darkSurface,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  doneButtonText: {
+    fontSize: 15,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.textSecondary,
+  },
+});
+
+
+--------------------------------------------
+FILE: app/history.tsx
+--------------------------------------------
+import React, { useState, useCallback } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  Pressable,
+  Alert,
+  Platform,
+} from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
+import Colors from "@/constants/colors";
+import type { Performance } from "@/lib/types";
+import { getPerformances, deletePerformance } from "@/lib/storage";
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatDate(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function PerformanceCard({
+  item,
+  onDelete,
+}: {
+  item: Performance;
+  onDelete: (id: string) => void;
+}) {
+  const timeDiff = item.actualDuration - item.plannedDuration;
+
+  const handlePress = () => {
+    router.push({
+      pathname: "/feedback",
+      params: { performanceId: item.id },
+    });
+  };
+
+  const handleDelete = () => {
+    if (Platform.OS === "web") {
+      onDelete(item.id);
+      return;
+    }
+    Alert.alert("Delete Performance", "Delete this performance record?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => onDelete(item.id),
+      },
+    ]);
+  };
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+      onPress={handlePress}
+    >
+      <View style={styles.cardHeader}>
+        <View style={styles.cardTitleRow}>
+          <Ionicons name="mic" size={16} color={Colors.amber} />
+          <Text style={styles.cardTitle} numberOfLines={1}>
+            {item.setTitle}
+          </Text>
+        </View>
+        <Pressable onPress={handleDelete} hitSlop={12}>
+          <Feather name="trash-2" size={15} color={Colors.textMuted} />
+        </Pressable>
+      </View>
+
+      <Text style={styles.dateText}>{formatDate(item.performedAt)}</Text>
+
+      <View style={styles.statsRow}>
+        <View style={styles.stat}>
+          <Text style={styles.statValue}>
+            {formatTime(item.actualDuration)}
+          </Text>
+          <Text style={styles.statLabel}>Duration</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text
+            style={[
+              styles.statValue,
+              {
+                color:
+                  Math.abs(timeDiff) <= 30 ? Colors.success : Colors.danger,
+              },
+            ]}
+          >
+            {timeDiff > 0 ? "+" : ""}
+            {formatTime(timeDiff)}
+          </Text>
+          <Text style={styles.statLabel}>vs Plan</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={styles.statValue}>{item.bits.length}</Text>
+          <Text style={styles.statLabel}>Bits</Text>
+        </View>
+      </View>
+
+      <View style={styles.badges}>
+        {item.recordingUri && (
+          <View style={styles.badge}>
+            <Ionicons name="mic" size={11} color={Colors.amber} />
+            <Text style={styles.badgeText}>Recorded</Text>
+          </View>
+        )}
+        {item.feedback && (
+          <View style={[styles.badge, { borderColor: "rgba(124,92,252,0.3)" }]}>
+            <Ionicons name="sparkles" size={11} color={Colors.accent} />
+            <Text style={[styles.badgeText, { color: Colors.accent }]}>
+              AI Feedback
+            </Text>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+export default function HistoryScreen() {
+  const insets = useSafeAreaInsets();
+  const [performances, setPerformances] = useState<Performance[]>([]);
+
+  const webTopInset = Platform.OS === "web" ? 67 : 0;
+  const webBottomInset = Platform.OS === "web" ? 34 : 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPerformances();
+    }, [])
+  );
+
+  const loadPerformances = async () => {
+    const data = await getPerformances();
+    setPerformances(data);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deletePerformance(id);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    loadPerformances();
+  };
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + webTopInset,
+          paddingBottom: insets.bottom + webBottomInset,
+        },
+      ]}
+    >
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Performance History</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <FlatList
+        data={performances}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <PerformanceCard item={item} onDelete={handleDelete} />
+        )}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={!!performances.length}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="time-outline" size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyTitle}>No performances yet</Text>
+            <Text style={styles.emptyText}>
+              Complete a set to see your history here
+            </Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.navy,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    gap: 12,
+  },
+  card: {
+    backgroundColor: Colors.cardBg,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  dateText: {
+    fontSize: 12,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+    marginTop: 6,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.06)",
+  },
+  stat: {
+    alignItems: "center",
+    gap: 3,
+  },
+  statValue: {
+    fontSize: 16,
+    fontFamily: "JetBrainsMono_700Bold",
+    color: Colors.textPrimary,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textMuted,
+  },
+  badges: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(245, 166, 35, 0.3)",
+  },
+  badgeText: {
+    fontSize: 11,
+    fontFamily: "SpaceGrotesk_500Medium",
+    color: Colors.amber,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 120,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontFamily: "SpaceGrotesk_600SemiBold",
+    color: Colors.textPrimary,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: "SpaceGrotesk_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 40,
+  },
+});
+
+
+--------------------------------------------
+FILE: lib/types.ts
+--------------------------------------------
+export interface BrainDrainNote {
+  id: string;
+  text: string;
+  tag: "bit-idea" | "punchline" | "premise" | "callback" | "general";
+  createdAt: number;
+  usedInSetId: string | null;
+}
+
+export interface Bit {
+  id: string;
+  title: string;
+  notes: string;
+  duration: number;
+}
+
+export interface ComedySet {
+  id: string;
+  title: string;
+  bits: Bit[];
+  totalDuration: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Performance {
+  id: string;
+  setId: string;
+  setTitle: string;
+  bits: Bit[];
+  actualDuration: number;
+  plannedDuration: number;
+  recordingUri: string | null;
+  feedback: string | null;
+  notes: string | null;
+  performedAt: number;
+}
+
+
+--------------------------------------------
+FILE: lib/storage.ts
+--------------------------------------------
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { BrainDrainNote, ComedySet, Performance } from "./types";
+
+const SETS_KEY = "@setflow_sets";
+const PERFORMANCES_KEY = "@setflow_performances";
+const BRAINDRAIN_KEY = "@setflow_braindrain";
+
+export async function getSets(): Promise<ComedySet[]> {
+  const data = await AsyncStorage.getItem(SETS_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export async function saveSet(set: ComedySet): Promise<void> {
+  const sets = await getSets();
+  const idx = sets.findIndex((s) => s.id === set.id);
+  if (idx >= 0) {
+    sets[idx] = set;
+  } else {
+    sets.unshift(set);
+  }
+  await AsyncStorage.setItem(SETS_KEY, JSON.stringify(sets));
+}
+
+export async function deleteSet(id: string): Promise<void> {
+  const sets = await getSets();
+  await AsyncStorage.setItem(
+    SETS_KEY,
+    JSON.stringify(sets.filter((s) => s.id !== id))
+  );
+}
+
+export async function getPerformances(): Promise<Performance[]> {
+  const data = await AsyncStorage.getItem(PERFORMANCES_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export async function savePerformance(perf: Performance): Promise<void> {
+  const perfs = await getPerformances();
+  const idx = perfs.findIndex((p) => p.id === perf.id);
+  if (idx >= 0) {
+    perfs[idx] = perf;
+  } else {
+    perfs.unshift(perf);
+  }
+  await AsyncStorage.setItem(PERFORMANCES_KEY, JSON.stringify(perfs));
+}
+
+export async function deletePerformance(id: string): Promise<void> {
+  const perfs = await getPerformances();
+  await AsyncStorage.setItem(
+    PERFORMANCES_KEY,
+    JSON.stringify(perfs.filter((p) => p.id !== id))
+  );
+}
+
+export async function getBrainDrainNotes(): Promise<BrainDrainNote[]> {
+  const data = await AsyncStorage.getItem(BRAINDRAIN_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export async function saveBrainDrainNote(note: BrainDrainNote): Promise<void> {
+  const notes = await getBrainDrainNotes();
+  const idx = notes.findIndex((n) => n.id === note.id);
+  if (idx >= 0) {
+    notes[idx] = note;
+  } else {
+    notes.unshift(note);
+  }
+  await AsyncStorage.setItem(BRAINDRAIN_KEY, JSON.stringify(notes));
+}
+
+export async function deleteBrainDrainNote(id: string): Promise<void> {
+  const notes = await getBrainDrainNotes();
+  await AsyncStorage.setItem(
+    BRAINDRAIN_KEY,
+    JSON.stringify(notes.filter((n) => n.id !== id))
+  );
+}
+
+
+--------------------------------------------
+FILE: lib/query-client.ts
+--------------------------------------------
+import { fetch } from "expo/fetch";
+import { QueryClient, QueryFunction } from "@tanstack/react-query";
+
+/**
+ * Gets the base URL for the Express API server (e.g., "http://localhost:3000")
+ * @returns {string} The API base URL
+ */
+export function getApiUrl(): string {
+  let host = process.env.EXPO_PUBLIC_DOMAIN;
+
+  if (!host) {
+    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+  }
+
+  let url = new URL(`https://${host}`);
+
+  return url.href;
+}
+
+async function throwIfResNotOk(res: Response) {
+  if (!res.ok) {
+    const text = (await res.text()) || res.statusText;
+    throw new Error(`${res.status}: ${text}`);
+  }
+}
+
+export async function apiRequest(
+  method: string,
+  route: string,
+  data?: unknown | undefined,
+): Promise<Response> {
+  const baseUrl = getApiUrl();
+  const url = new URL(route, baseUrl);
+
+  const res = await fetch(url.toString(), {
+    method,
+    headers: data ? { "Content-Type": "application/json" } : {},
+    body: data ? JSON.stringify(data) : undefined,
+    credentials: "include",
+  });
+
+  await throwIfResNotOk(res);
+  return res;
+}
+
+type UnauthorizedBehavior = "returnNull" | "throw";
+export const getQueryFn: <T>(options: {
+  on401: UnauthorizedBehavior;
+}) => QueryFunction<T> =
+  ({ on401: unauthorizedBehavior }) =>
+  async ({ queryKey }) => {
+    const baseUrl = getApiUrl();
+    const url = new URL(queryKey.join("/") as string, baseUrl);
+
+    const res = await fetch(url.toString(), {
+      credentials: "include",
+    });
+
+    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      return null;
+    }
+
+    await throwIfResNotOk(res);
+    return await res.json();
+  };
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryFn: getQueryFn({ on401: "throw" }),
+      refetchInterval: false,
+      refetchOnWindowFocus: false,
+      staleTime: Infinity,
+      retry: false,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+});
+
+
+--------------------------------------------
+FILE: constants/colors.ts
+--------------------------------------------
+const amber = "#F5A623";
+const amberLight = "#FFD280";
+const charcoal = "#1A1A2E";
+const navy = "#0F0F1A";
+const darkSurface = "#16162A";
+const cardBg = "#1E1E36";
+const inputBg = "#252542";
+const textPrimary = "#FFFFFF";
+const textSecondary = "rgba(255, 255, 255, 0.6)";
+const textMuted = "rgba(255, 255, 255, 0.35)";
+const danger = "#FF4757";
+const success = "#2ED573";
+const accent = "#7C5CFC";
+
+export default {
+  amber,
+  amberLight,
+  charcoal,
+  navy,
+  darkSurface,
+  cardBg,
+  inputBg,
+  textPrimary,
+  textSecondary,
+  textMuted,
+  danger,
+  success,
+  accent,
+  light: {
+    text: textPrimary,
+    background: navy,
+    tint: amber,
+    tabIconDefault: textMuted,
+    tabIconSelected: amber,
+  },
+};
+
+
+--------------------------------------------
+FILE: components/ErrorBoundary.tsx
+--------------------------------------------
+import React, { Component, ComponentType, PropsWithChildren } from "react";
+import { ErrorFallback, ErrorFallbackProps } from "@/components/ErrorFallback";
+
+export type ErrorBoundaryProps = PropsWithChildren<{
+  FallbackComponent?: ComponentType<ErrorFallbackProps>;
+  onError?: (error: Error, stackTrace: string) => void;
+}>;
+
+type ErrorBoundaryState = { error: Error | null };
+
+/**
+ * This is a special case for for using the class components. Error boundaries must be class components because React only provides error boundary functionality through lifecycle methods (componentDidCatch and getDerivedStateFromError) which are not available in functional components.
+ * https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary
+ */
+
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
+  state: ErrorBoundaryState = { error: null };
+
+  static defaultProps: {
+    FallbackComponent: ComponentType<ErrorFallbackProps>;
+  } = {
+    FallbackComponent: ErrorFallback,
+  };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: { componentStack: string }): void {
+    if (typeof this.props.onError === "function") {
+      this.props.onError(error, info.componentStack);
+    }
+  }
+
+  resetError = (): void => {
+    this.setState({ error: null });
+  };
+
+  render() {
+    const { FallbackComponent } = this.props;
+
+    return this.state.error && FallbackComponent ? (
+      <FallbackComponent
+        error={this.state.error}
+        resetError={this.resetError}
+      />
+    ) : (
+      this.props.children
+    );
+  }
+}
+
+
+--------------------------------------------
+FILE: components/ErrorFallback.tsx
+--------------------------------------------
+import React, { useState } from "react";
+import { reloadAppAsync } from "expo";
+import {
+  StyleSheet,
+  View,
+  Pressable,
+  ScrollView,
+  Text,
+  Modal,
+  useColorScheme,
+  Platform,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+
+export type ErrorFallbackProps = {
+  error: Error;
+  resetError: () => void;
+};
+
+export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const insets = useSafeAreaInsets();
+
+  const theme = {
+    background: isDark ? "#000000" : "#FFFFFF",
+    backgroundSecondary: isDark ? "#1C1C1E" : "#F2F2F7",
+    text: isDark ? "#FFFFFF" : "#000000",
+    textSecondary: isDark ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)",
+    link: "#007AFF",
+    buttonText: "#FFFFFF",
+  };
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const handleRestart = async () => {
+    try {
+      await reloadAppAsync();
+    } catch (restartError) {
+      console.error("Failed to restart app:", restartError);
+      resetError();
+    }
+  };
+
+  const formatErrorDetails = (): string => {
+    let details = `Error: ${error.message}\n\n`;
+    if (error.stack) {
+      details += `Stack Trace:\n${error.stack}`;
+    }
+    return details;
+  };
+
+  const monoFont = Platform.select({
+    ios: "Menlo",
+    android: "monospace",
+    default: "monospace",
+  });
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {__DEV__ ? (
+        <Pressable
+          onPress={() => setIsModalVisible(true)}
+          accessibilityLabel="View error details"
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.topButton,
+            {
+              top: insets.top + 16,
+              backgroundColor: theme.backgroundSecondary,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          <Feather name="alert-circle" size={20} color={theme.text} />
+        </Pressable>
+      ) : null}
+
+      <View style={styles.content}>
+        <Text style={[styles.title, { color: theme.text }]}>
+          Something went wrong
+        </Text>
+
+        <Text style={[styles.message, { color: theme.textSecondary }]}>
+          Please reload the app to continue.
+        </Text>
+
+        <Pressable
+          onPress={handleRestart}
+          style={({ pressed }) => [
+            styles.button,
+            {
+              backgroundColor: theme.link,
+              opacity: pressed ? 0.9 : 1,
+              transform: [{ scale: pressed ? 0.98 : 1 }],
+            },
+          ]}
+        >
+          <Text style={[styles.buttonText, { color: theme.buttonText }]}>
+            Try Again
+          </Text>
+        </Pressable>
+      </View>
+
+      {__DEV__ ? (
+        <Modal
+          visible={isModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.modalContainer,
+                { backgroundColor: theme.background },
+              ]}
+            >
+              <View
+                style={[
+                  styles.modalHeader,
+                  {
+                    borderBottomColor: isDark
+                      ? "rgba(255, 255, 255, 0.1)"
+                      : "rgba(0, 0, 0, 0.1)",
+                  },
+                ]}
+              >
+                <Text style={[styles.modalTitle, { color: theme.text }]}>
+                  Error Details
+                </Text>
+                <Pressable
+                  onPress={() => setIsModalVisible(false)}
+                  accessibilityLabel="Close error details"
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.closeButton,
+                    { opacity: pressed ? 0.6 : 1 },
+                  ]}
+                >
+                  <Feather name="x" size={24} color={theme.text} />
+                </Pressable>
+              </View>
+
+              <ScrollView
+                style={styles.modalScrollView}
+                contentContainerStyle={[
+                  styles.modalScrollContent,
+                  { paddingBottom: insets.bottom + 16 },
+                ]}
+                showsVerticalScrollIndicator
+              >
+                <View
+                  style={[
+                    styles.errorContainer,
+                    { backgroundColor: theme.backgroundSecondary },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.errorText,
+                      {
+                        color: theme.text,
+                        fontFamily: monoFont,
+                      },
+                    ]}
+                    selectable
+                  >
+                    {formatErrorDetails()}
+                  </Text>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  content: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    width: "100%",
+    maxWidth: 600,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "700",
+    textAlign: "center",
+    lineHeight: 40,
+  },
+  message: {
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  topButton: {
+    position: "absolute",
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+  },
+  button: {
+    paddingVertical: 16,
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    minWidth: 200,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  buttonText: {
+    fontWeight: "600",
+    textAlign: "center",
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContainer: {
+    width: "100%",
+    height: "90%",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+  },
+  closeButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalScrollView: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    padding: 16,
+  },
+  errorContainer: {
+    width: "100%",
+    borderRadius: 8,
+    overflow: "hidden",
+    padding: 16,
+  },
+  errorText: {
+    fontSize: 12,
+    lineHeight: 18,
+    width: "100%",
+  },
+});
+
+
+--------------------------------------------
+FILE: server/index.ts
+--------------------------------------------
+import express from "express";
+import type { Request, Response, NextFunction } from "express";
+import { registerRoutes } from "./routes";
+import * as fs from "fs";
+import * as path from "path";
+
+const app = express();
+const log = console.log;
+
+declare module "http" {
+  interface IncomingMessage {
+    rawBody: unknown;
+  }
+}
+
+function setupCors(app: express.Application) {
+  app.use((req, res, next) => {
+    const origins = new Set<string>();
+
+    if (process.env.REPLIT_DEV_DOMAIN) {
+      origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
+    }
+
+    if (process.env.REPLIT_DOMAINS) {
+      process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
+        origins.add(`https://${d.trim()}`);
+      });
+    }
+
+    const origin = req.header("origin");
+
+    // Allow localhost origins for Expo web development (any port)
+    const isLocalhost =
+      origin?.startsWith("http://localhost:") ||
+      origin?.startsWith("http://127.0.0.1:");
+
+    if (origin && (origins.has(origin) || isLocalhost)) {
+      res.header("Access-Control-Allow-Origin", origin);
+      res.header(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, DELETE, OPTIONS",
+      );
+      res.header("Access-Control-Allow-Headers", "Content-Type");
+      res.header("Access-Control-Allow-Credentials", "true");
+    }
+
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+
+    next();
+  });
+}
+
+function setupBodyParsing(app: express.Application) {
+  app.use(
+    express.json({
+      verify: (req, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
+
+  app.use(express.urlencoded({ extended: false }));
+}
+
+function setupRequestLogging(app: express.Application) {
+  app.use((req, res, next) => {
+    const start = Date.now();
+    const path = req.path;
+    let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
+
+    const originalResJson = res.json;
+    res.json = function (bodyJson, ...args) {
+      capturedJsonResponse = bodyJson;
+      return originalResJson.apply(res, [bodyJson, ...args]);
+    };
+
+    res.on("finish", () => {
+      if (!path.startsWith("/api")) return;
+
+      const duration = Date.now() - start;
+
+      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      if (capturedJsonResponse) {
+        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      }
+
+      if (logLine.length > 80) {
+        logLine = logLine.slice(0, 79) + "…";
+      }
+
+      log(logLine);
+    });
+
+    next();
+  });
+}
+
+function getAppName(): string {
+  try {
+    const appJsonPath = path.resolve(process.cwd(), "app.json");
+    const appJsonContent = fs.readFileSync(appJsonPath, "utf-8");
+    const appJson = JSON.parse(appJsonContent);
+    return appJson.expo?.name || "App Landing Page";
+  } catch {
+    return "App Landing Page";
+  }
+}
+
+function serveExpoManifest(platform: string, res: Response) {
+  const manifestPath = path.resolve(
+    process.cwd(),
+    "static-build",
+    platform,
+    "manifest.json",
+  );
+
+  if (!fs.existsSync(manifestPath)) {
+    return res
+      .status(404)
+      .json({ error: `Manifest not found for platform: ${platform}` });
+  }
+
+  res.setHeader("expo-protocol-version", "1");
+  res.setHeader("expo-sfv-version", "0");
+  res.setHeader("content-type", "application/json");
+
+  const manifest = fs.readFileSync(manifestPath, "utf-8");
+  res.send(manifest);
+}
+
+function serveLandingPage({
+  req,
+  res,
+  landingPageTemplate,
+  appName,
+}: {
+  req: Request;
+  res: Response;
+  landingPageTemplate: string;
+  appName: string;
+}) {
+  const forwardedProto = req.header("x-forwarded-proto");
+  const protocol = forwardedProto || req.protocol || "https";
+  const forwardedHost = req.header("x-forwarded-host");
+  const host = forwardedHost || req.get("host");
+  const baseUrl = `${protocol}://${host}`;
+  const expsUrl = `${host}`;
+
+  log(`baseUrl`, baseUrl);
+  log(`expsUrl`, expsUrl);
+
+  const html = landingPageTemplate
+    .replace(/BASE_URL_PLACEHOLDER/g, baseUrl)
+    .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)
+    .replace(/APP_NAME_PLACEHOLDER/g, appName);
+
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.status(200).send(html);
+}
+
+function configureExpoAndLanding(app: express.Application) {
+  const templatePath = path.resolve(
+    process.cwd(),
+    "server",
+    "templates",
+    "landing-page.html",
+  );
+  const featuresTemplatePath = path.resolve(
+    process.cwd(),
+    "server",
+    "templates",
+    "features-page.html",
+  );
+  const landingPageTemplate = fs.readFileSync(templatePath, "utf-8");
+  const featuresPageTemplate = fs.readFileSync(featuresTemplatePath, "utf-8");
+  const appName = getAppName();
+
+  log("Serving static Expo files with dynamic manifest routing");
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith("/api")) {
+      return next();
+    }
+
+    if (req.path !== "/" && req.path !== "/manifest" && req.path !== "/features") {
+      return next();
+    }
+
+    const platform = req.header("expo-platform");
+    if (platform && (platform === "ios" || platform === "android")) {
+      return serveExpoManifest(platform, res);
+    }
+
+    if (req.path === "/features") {
+      return serveLandingPage({
+        req,
+        res,
+        landingPageTemplate: featuresPageTemplate,
+        appName,
+      });
+    }
+
+    if (req.path === "/") {
+      return serveLandingPage({
+        req,
+        res,
+        landingPageTemplate,
+        appName,
+      });
+    }
+
+    next();
+  });
+
+  app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
+  app.use(express.static(path.resolve(process.cwd(), "static-build")));
+
+  log("Expo routing: Checking expo-platform header on / and /manifest");
+}
+
+function setupErrorHandler(app: express.Application) {
+  app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+    const error = err as {
+      status?: number;
+      statusCode?: number;
+      message?: string;
+    };
+
+    const status = error.status || error.statusCode || 500;
+    const message = error.message || "Internal Server Error";
+
+    console.error("Internal Server Error:", err);
+
+    if (res.headersSent) {
+      return next(err);
+    }
+
+    return res.status(status).json({ message });
+  });
+}
+
+(async () => {
+  setupCors(app);
+  setupBodyParsing(app);
+  setupRequestLogging(app);
+
+  configureExpoAndLanding(app);
+
+  const server = await registerRoutes(app);
+
+  setupErrorHandler(app);
+
+  const port = parseInt(process.env.PORT || "5000", 10);
+  server.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    },
+    () => {
+      log(`express server serving on port ${port}`);
+    },
+  );
+})();
+
+
+--------------------------------------------
+FILE: server/routes.ts
+--------------------------------------------
+import type { Express } from "express";
+import { createServer, type Server } from "node:http";
+import { handleFeedback } from "./feedback";
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  app.post("/api/feedback", handleFeedback);
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
+
+
+--------------------------------------------
+FILE: server/feedback.ts
+--------------------------------------------
+import { GoogleGenAI } from "@google/genai";
+import type { Request, Response } from "express";
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY!,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL!,
+  },
+});
+
+export async function handleFeedback(req: Request, res: Response) {
+  try {
+    const { setTitle, bits, totalDuration, actualDuration, notes } = req.body;
+
+    if (!bits || !Array.isArray(bits)) {
+      return res.status(400).json({ error: "bits array is required" });
+    }
+
+    const bitsDescription = bits
+      .map(
+        (b: { title: string; duration: number; notes: string }, i: number) =>
+          `${i + 1}. "${b.title}" (planned: ${b.duration}s) - Notes: ${b.notes || "none"}`
+      )
+      .join("\n");
+
+    const prompt = `You are an experienced comedy coach and set consultant. A comedian just performed a set. Analyze their set structure and provide constructive, actionable feedback.
+
+Set Title: "${setTitle || "Untitled Set"}"
+Total Planned Duration: ${totalDuration || "unknown"} seconds
+Actual Duration: ${actualDuration || "unknown"} seconds
+${notes ? `Comedian's Post-Show Notes: ${notes}` : ""}
+
+Set List (bits in order):
+${bitsDescription}
+
+Please provide feedback in the following format:
+
+**Overall Assessment**
+A brief 2-3 sentence overview of the set structure.
+
+**Pacing Analysis**
+- Comment on timing and flow between bits
+- Note if the set felt rushed or dragged
+${actualDuration && totalDuration ? `- The comedian ${actualDuration > totalDuration ? "went over" : "came in under"} their planned time by ${Math.abs(actualDuration - totalDuration)} seconds` : ""}
+
+**Set Structure**
+- Comment on the opening bit choice
+- Comment on the closing bit choice
+- Note the overall arc and energy flow
+
+**Suggestions**
+- 3-4 specific, actionable suggestions for improvement
+- Consider bit ordering, callbacks, transitions
+
+**Highlight**
+Pick out the strongest element of their set structure and explain why it works.
+
+Keep the tone encouraging but honest. Be specific, not generic.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: { maxOutputTokens: 2048 },
+    });
+
+    const feedbackText = response.text || "Unable to generate feedback at this time.";
+
+    res.json({ feedback: feedbackText });
+  } catch (error) {
+    console.error("Error generating feedback:", error);
+    res.status(500).json({ error: "Failed to generate feedback" });
+  }
+}
+
+
+--------------------------------------------
+FILE: server/storage.ts
+--------------------------------------------
+import { type User, type InsertUser } from "@shared/schema";
+import { randomUUID } from "crypto";
+
+// modify the interface with any CRUD methods
+// you might need
+
+export interface IStorage {
+  getUser(id: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+}
+
+export class MemStorage implements IStorage {
+  private users: Map<string, User>;
+
+  constructor() {
+    this.users = new Map();
+  }
+
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username,
+    );
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const user: User = { ...insertUser, id };
+    this.users.set(id, user);
+    return user;
+  }
+}
+
+export const storage = new MemStorage();
+
+
+--------------------------------------------
+FILE: server/templates/landing-page.html
+--------------------------------------------
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>SetFlow — Your Comedy Set Assistant</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Time your set, follow your notes, record your performance, and get AI coaching — all from your phone." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      html{scroll-behavior:smooth}
+      body{font-family:"Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0f0f1a;color:#fff;min-height:100vh;overflow-x:hidden}
+
+      /* ── NAV ── */
+      nav{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:16px 40px;z-index:100;transition:background .35s,border-color .35s}
+      nav.scrolled{background:rgba(15,15,26,.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid rgba(255,255,255,.04)}
+      .nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+      .nav-logo{width:36px;height:36px;border-radius:10px;object-fit:cover}
+      .nav-wordmark{font-size:20px;font-weight:700;background:linear-gradient(135deg,#f5a623,#ffcf6f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.4px}
+      .nav-right{display:flex;align-items:center;gap:10px}
+      .btn{display:inline-flex;align-items:center;justify-content:center;font-family:"Space Grotesk",sans-serif;font-weight:600;border:none;cursor:pointer;transition:all .25s;text-decoration:none;gap:8px}
+      .btn-nav{padding:10px 22px;font-size:14px;border-radius:10px}
+      .btn-ghost{background:transparent;color:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.1)}
+      .btn-ghost:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rgba(255,255,255,.2)}
+      .btn-primary{background:#f5a623;color:#0f0f1a}
+      .btn-primary:hover{background:#ffd280;transform:translateY(-1px);box-shadow:0 6px 24px rgba(245,166,35,.35)}
+      .btn-lg{padding:16px 36px;font-size:16px;border-radius:13px}
+      .btn-xl{padding:18px 44px;font-size:17px;border-radius:14px}
+
+      /* ── HERO ── */
+      .hero{position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:120px 24px 80px;overflow:hidden}
+
+      /* ambient background orbs */
+      .orb{position:absolute;border-radius:50%;pointer-events:none;filter:blur(80px)}
+      .orb-1{top:-20%;left:30%;width:700px;height:700px;background:rgba(245,166,35,.07);animation:drift-1 18s ease-in-out infinite}
+      .orb-2{bottom:-10%;right:20%;width:500px;height:500px;background:rgba(124,92,252,.06);animation:drift-2 22s ease-in-out infinite}
+      .orb-3{top:40%;left:-10%;width:400px;height:400px;background:rgba(245,166,35,.04);animation:drift-3 15s ease-in-out infinite}
+      @keyframes drift-1{0%,100%{transform:translate(0,0)}50%{transform:translate(40px,30px)}}
+      @keyframes drift-2{0%,100%{transform:translate(0,0)}50%{transform:translate(-30px,-20px)}}
+      @keyframes drift-3{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,-25px)}}
+
+      /* grid lines background */
+      .grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,black 30%,transparent 70%);-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,black 30%,transparent 70%);pointer-events:none}
+
+      .hero-inner{position:relative;z-index:2;text-align:center;max-width:800px}
+
+      /* logo lockup */
+      .logo-lockup{display:flex;flex-direction:column;align-items:center;margin-bottom:40px}
+      .logo-icon{width:100px;height:100px;border-radius:28px;box-shadow:0 20px 60px rgba(245,166,35,.2),0 0 0 1px rgba(245,166,35,.1);animation:logo-float 6s ease-in-out infinite;margin-bottom:20px}
+      @keyframes logo-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+      .logo-text{font-size:52px;font-weight:700;background:linear-gradient(135deg,#f5a623 0%,#ffcf6f 50%,#f5a623 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-2px;animation:shimmer 4s linear infinite}
+      @keyframes shimmer{to{background-position:200% center}}
+      .logo-tagline{font-size:15px;font-weight:400;color:rgba(255,255,255,.35);letter-spacing:.5px;margin-top:6px}
+
+      .hero-headline{font-size:48px;font-weight:700;color:#fff;letter-spacing:-1.8px;line-height:1.1;margin-bottom:20px}
+      .hero-headline .em{background:linear-gradient(135deg,#f5a623,#ffcf6f);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .hero-sub{font-size:18px;color:rgba(255,255,255,.45);line-height:1.7;max-width:520px;margin:0 auto 44px}
+
+      .hero-actions{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+
+      .trust-line{display:flex;align-items:center;gap:8px;font-size:13px;color:rgba(255,255,255,.25);margin-top:8px}
+      .trust-dot{width:5px;height:5px;border-radius:50%;background:#2ed573}
+
+      /* ── FEATURES STRIP ── */
+      .features-strip{position:relative;z-index:2;padding:80px 24px;background:linear-gradient(180deg,rgba(15,15,26,0) 0%,rgba(20,20,38,.6) 30%,rgba(20,20,38,.6) 70%,rgba(15,15,26,0) 100%)}
+      .features-strip-inner{max-width:1040px;margin:0 auto}
+      .strip-label{text-align:center;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:#7c5cfc;margin-bottom:40px}
+      .features-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+      .f-card{background:rgba(30,30,54,.45);border:1px solid rgba(255,255,255,.04);border-radius:16px;padding:28px 24px;transition:all .3s;position:relative;overflow:hidden}
+      .f-card::after{content:"";position:absolute;inset:0;border-radius:16px;opacity:0;transition:opacity .3s;background:linear-gradient(135deg,rgba(245,166,35,.03),rgba(124,92,252,.03))}
+      .f-card:hover{border-color:rgba(255,255,255,.08);transform:translateY(-3px);box-shadow:0 16px 40px rgba(0,0,0,.25)}
+      .f-card:hover::after{opacity:1}
+      .f-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;position:relative;z-index:1}
+      .f-icon svg{width:22px;height:22px}
+      .f-title{font-size:16px;font-weight:600;color:#fff;margin-bottom:6px;position:relative;z-index:1}
+      .f-desc{font-size:13px;color:rgba(255,255,255,.38);line-height:1.6;position:relative;z-index:1}
+
+      /* ── LIVE TIMER SECTION ── */
+      .timer-section{padding:80px 24px;text-align:center;position:relative;overflow:hidden}
+      .timer-section::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:500px;height:500px;background:radial-gradient(circle,rgba(245,166,35,.06) 0%,transparent 60%);border-radius:50%;pointer-events:none}
+      .timer-section .strip-label{margin-bottom:24px}
+      .timer-title{font-size:28px;font-weight:700;color:#fff;letter-spacing:-.5px;margin-bottom:8px}
+      .timer-sub{font-size:14px;color:rgba(255,255,255,.35);margin-bottom:36px}
+      .timer-display{font-family:"JetBrains Mono",monospace;font-size:88px;font-weight:700;color:#f5a623;letter-spacing:-4px;text-shadow:0 0 80px rgba(245,166,35,.18);line-height:1;margin-bottom:16px;animation:t-pulse 3s ease-in-out infinite}
+      @keyframes t-pulse{0%,100%{opacity:1;text-shadow:0 0 80px rgba(245,166,35,.18)}50%{opacity:.85;text-shadow:0 0 100px rgba(245,166,35,.28)}}
+      .timer-elapsed{font-family:"JetBrains Mono",monospace;font-size:14px;color:rgba(255,255,255,.25);margin-bottom:32px}
+      .timer-bits{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+      .t-bit{padding:8px 18px;border-radius:10px;font-size:13px;font-weight:500}
+      .t-bit-done{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);color:rgba(255,255,255,.25);text-decoration:line-through}
+      .t-bit-active{background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.28);color:#f5a623}
+      .t-bit-next{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.4)}
+
+      /* ── CTA BOTTOM ── */
+      .cta-bottom{padding:80px 24px 100px;text-align:center;position:relative}
+      .cta-bottom::before{content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:600px;height:400px;background:radial-gradient(ellipse,rgba(124,92,252,.06) 0%,transparent 60%);pointer-events:none}
+      .cta-heading{font-size:36px;font-weight:700;color:#fff;letter-spacing:-1px;margin-bottom:14px}
+      .cta-sub{font-size:16px;color:rgba(255,255,255,.4);max-width:420px;margin:0 auto 36px;line-height:1.6}
+      .cta-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+      .cta-learn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:rgba(255,255,255,.3);text-decoration:none;transition:color .2s}
+      .cta-learn:hover{color:rgba(255,255,255,.6)}
+      .cta-learn svg{transition:transform .2s}
+      .cta-learn:hover svg{transform:translateX(3px)}
+
+      /* ── FOOTER ── */
+      footer{text-align:center;padding:28px 24px;font-size:12px;color:rgba(255,255,255,.15);border-top:1px solid rgba(255,255,255,.03)}
+
+      /* ── LOADING ── */
+      .loading{display:none;text-align:center;padding:80px 0}
+      .spinner{border:2px solid rgba(255,255,255,.1);border-top-color:#f5a623;border-radius:50%;width:32px;height:32px;animation:spin .8s linear infinite;margin:20px auto}
+      @keyframes spin{to{transform:rotate(360deg)}}
+      .loading-text{font-size:15px;color:rgba(255,255,255,.5)}
+
+      /* ── ACCESSIBILITY ── */
+      .btn:focus-visible{outline:2px solid #f5a623;outline-offset:2px}
+      a:focus-visible{outline:2px solid #f5a623;outline-offset:2px}
+      @media(prefers-reduced-motion:reduce){
+        *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+      }
+
+      /* ── RESPONSIVE ── */
+      @media(max-width:900px){
+        .features-row{grid-template-columns:1fr 1fr}
+      }
+      @media(max-width:640px){
+        nav{padding:12px 16px}
+        .nav-wordmark{font-size:17px}
+        .btn-nav{padding:8px 16px;font-size:13px}
+        .hero{padding:100px 16px 60px;min-height:auto}
+        .logo-icon{width:80px;height:80px;border-radius:22px}
+        .logo-text{font-size:40px}
+        .hero-headline{font-size:32px;letter-spacing:-1px}
+        .hero-sub{font-size:15px}
+        .hero-actions{flex-direction:column;width:100%;max-width:300px;margin-left:auto;margin-right:auto}
+        .btn-xl,.btn-lg{width:100%}
+        .features-row{grid-template-columns:1fr;max-width:400px;margin:0 auto}
+        .timer-display{font-size:56px;letter-spacing:-2px}
+        .cta-heading{font-size:26px}
+        .cta-actions{flex-direction:column;max-width:280px;margin-left:auto;margin-right:auto}
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- NAV -->
+    <nav id="nav">
+      <a href="/" class="nav-brand">
+        <img src="/assets/images/icon.png" alt="SetFlow" class="nav-logo" />
+        <span class="nav-wordmark">SetFlow</span>
+      </a>
+      <div class="nav-right">
+        <a href="#" class="btn btn-nav btn-ghost" id="signin-btn-nav">Sign In</a>
+        <a href="#" class="btn btn-nav btn-primary" id="signup-btn-nav">Sign Up</a>
+      </div>
+    </nav>
+
+    <!-- LOADING (Expo redirect) -->
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div class="loading-text">Opening in Expo Go...</div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="content">
+
+      <!-- HERO -->
+      <section class="hero">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="grid-bg"></div>
+
+        <div class="hero-inner">
+          <div class="logo-lockup">
+            <img src="/assets/images/icon.png" alt="SetFlow" class="logo-icon" />
+            <div class="logo-text">SetFlow</div>
+            <div class="logo-tagline">Your comedy set assistant</div>
+          </div>
+
+          <h1 class="hero-headline">Own every second<br/>on <span class="em">stage</span></h1>
+          <p class="hero-sub">Time your set, follow your notes, record your performance, and get AI-powered coaching — all from your phone.</p>
+
+          <div class="hero-actions">
+            <a href="#" class="btn btn-primary btn-xl" id="signup-btn-hero" role="button">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+              Sign Up Free
+            </a>
+            <a href="#" class="btn btn-ghost btn-xl" id="signin-btn-hero">Sign In</a>
+          </div>
+
+          <div class="trust-line">
+            <span class="trust-dot"></span>
+            Free to use &middot; No credit card required
+          </div>
+        </div>
+      </section>
+
+      <!-- FEATURES STRIP -->
+      <section class="features-strip">
+        <div class="features-strip-inner">
+          <div class="strip-label">Everything you need on stage</div>
+          <div class="features-row">
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(245,166,35,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="f-title">Live Countdown Timer</div>
+              <div class="f-desc">A large, glanceable timer that counts down your total set and each individual bit so you always know where you stand.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(124,92,252,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </div>
+              <div class="f-title">Synced Set Notes</div>
+              <div class="f-desc">Your punchlines, tags, and stage directions scroll automatically as each bit advances — never lose your place.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(255,71,87,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#ff4757" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </div>
+              <div class="f-title">Audio Recording</div>
+              <div class="f-desc">Capture every performance to replay later. Review your timing, crowd work, and delivery in high quality audio.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(245,166,35,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <div class="f-title">AI Coach Feedback</div>
+              <div class="f-desc">Get personalized coaching from Google Gemini after every set — pacing tips, bit analysis, and actionable suggestions.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(124,92,252,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3-1.5 5-3 6.5V18a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.5C6.5 14 5 12 5 9a7 7 0 0 1 7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+              </div>
+              <div class="f-title">Brain Drain</div>
+              <div class="f-desc">Shower thought? Bar observation? Capture raw ideas instantly and tag them for later — before they disappear.</div>
+            </div>
+            <div class="f-card">
+              <div class="f-icon" style="background:rgba(46,213,115,.1)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#2ed573" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </div>
+              <div class="f-title">Set List Builder</div>
+              <div class="f-desc">Drag, drop, and arrange your bits into a tight set. Set durations per bit and see your total time at a glance.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LIVE TIMER SHOWCASE -->
+      <section class="timer-section">
+        <div class="strip-label">Built for the stage</div>
+        <div class="timer-title">A timer you can actually read</div>
+        <div class="timer-sub">Large, high-contrast display designed to be glanced at from a stool under stage lights</div>
+        <div class="timer-display" id="live-timer">04:32</div>
+        <div class="timer-elapsed"><span id="elapsed-display">02:28</span> elapsed of 07:00</div>
+        <div class="timer-bits">
+          <span class="t-bit t-bit-done">Opening</span>
+          <span class="t-bit t-bit-active">Dating Life</span>
+          <span class="t-bit t-bit-next">Airport Bit</span>
+          <span class="t-bit t-bit-next">Closer</span>
+        </div>
+      </section>
+
+      <!-- BOTTOM CTA -->
+      <section class="cta-bottom">
+        <div class="cta-heading">Ready to crush your next set?</div>
+        <div class="cta-sub">Join comedians who use SetFlow to tighten their timing, organize their material, and get better after every show.</div>
+        <div class="cta-actions">
+          <a href="#" class="btn btn-primary btn-lg" id="signup-btn-bottom">Sign Up Free</a>
+          <a href="#" class="btn btn-ghost btn-lg" id="signin-btn-bottom">Sign In</a>
+        </div>
+        <a href="/features" class="cta-learn">
+          Explore all features
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+      </section>
+
+      <footer>&copy; 2026 SetFlow. Built for comedians, by people who get it.</footer>
+    </div>
+
+    <script>
+      // Sticky nav background on scroll
+      (function(){
+        var nav=document.getElementById("nav");
+        window.addEventListener("scroll",function(){
+          nav.classList.toggle("scrolled",window.scrollY>40);
+        });
+      })();
+
+      // Live timer animation
+      (function(){
+        var totalSec=420;
+        var elapsed=148;
+        var dir=1;
+        var timerEl=document.getElementById("live-timer");
+        var elapsedEl=document.getElementById("elapsed-display");
+        function fmt(s){var m=Math.floor(Math.abs(s)/60);var sc=Math.abs(s)%60;return(s<0?"-":"")+String(m).padStart(2,"0")+":"+String(sc).padStart(2,"0")}
+        setInterval(function(){
+          elapsed+=dir;
+          if(elapsed>=totalSec-30) dir=-1;
+          if(elapsed<=60) dir=1;
+          var rem=totalSec-elapsed;
+          timerEl.textContent=fmt(rem);
+          elapsedEl.textContent=fmt(elapsed);
+        },1000);
+      })();
+
+      // Expo redirect on mobile
+      (function(){
+        var ua=navigator.userAgent;
+        var loadingEl=document.getElementById("loading");
+        var contentEl=document.getElementById("content");
+        var isAndroid=/Android/i.test(ua);
+        var isIOS=/iPhone|iPad|iPod/i.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+        var deepLink="exps://EXPS_URL_PLACEHOLDER";
+        if(isAndroid||isIOS){
+          loadingEl.style.display="block";
+          contentEl.style.display="none";
+          window.location.href=deepLink;
+          setTimeout(function(){loadingEl.style.display="none";contentEl.style.display="block"},500);
+        }
+      })();
+    </script>
+  </body>
+</html>
+
+
+--------------------------------------------
+FILE: server/templates/features-page.html
+--------------------------------------------
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>APP_NAME_PLACEHOLDER</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: #0f0f1a;
+        color: #fff;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 32px;
+        z-index: 100;
+        background: rgba(15, 15, 26, 0.8);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-decoration: none;
+      }
+      .nav-logo {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        object-fit: cover;
+      }
+      .nav-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #f5a623;
+        letter-spacing: -0.3px;
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+      }
+      .nav-link {
+        font-size: 14px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.5);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      .nav-link:hover {
+        color: #fff;
+      }
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 22px;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.25s;
+        text-decoration: none;
+        gap: 8px;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: rgba(255, 255, 255, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .btn-ghost:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .btn-primary {
+        background: #f5a623;
+        color: #0f0f1a;
+      }
+      .btn-primary:hover {
+        background: #ffd280;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 24px rgba(245, 166, 35, 0.35);
+      }
+      .btn-large {
+        padding: 15px 36px;
+        font-size: 16px;
+        border-radius: 13px;
+      }
+
+      .hero {
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 100px 24px 60px;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: -200px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 800px;
+        height: 800px;
+        background: radial-gradient(
+          circle,
+          rgba(245, 166, 35, 0.1) 0%,
+          rgba(124, 92, 252, 0.04) 40%,
+          transparent 65%
+        );
+        border-radius: 50%;
+        pointer-events: none;
+      }
+      .hero::after {
+        content: "";
+        position: absolute;
+        bottom: -100px;
+        right: -100px;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(
+          circle,
+          rgba(124, 92, 252, 0.08) 0%,
+          transparent 60%
+        );
+        border-radius: 50%;
+        pointer-events: none;
+      }
+
+      .hero-content {
+        position: relative;
+        text-align: center;
+        max-width: 720px;
+        z-index: 2;
+      }
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 16px;
+        background: rgba(245, 166, 35, 0.08);
+        border: 1px solid rgba(245, 166, 35, 0.15);
+        border-radius: 100px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #f5a623;
+        margin-bottom: 28px;
+      }
+      .hero-badge-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #f5a623;
+        animation: pulse-dot 2s ease-in-out infinite;
+      }
+      @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+      .hero-title {
+        font-size: 56px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -2px;
+        line-height: 1.08;
+        margin-bottom: 20px;
+      }
+      .hero-title .highlight {
+        background: linear-gradient(135deg, #f5a623, #ffcf6f);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .hero-subtitle {
+        font-size: 18px;
+        font-weight: 400;
+        color: rgba(255, 255, 255, 0.5);
+        line-height: 1.7;
+        max-width: 520px;
+        margin: 0 auto 40px;
+      }
+      .hero-cta {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 64px;
+      }
+
+      .phone-mockup {
+        position: relative;
+        width: 280px;
+        margin: 0 auto 0;
+        z-index: 2;
+      }
+      .phone-frame {
+        width: 280px;
+        height: 560px;
+        background: #1a1a2e;
+        border-radius: 36px;
+        border: 3px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03);
+        overflow: hidden;
+        position: relative;
+      }
+      .phone-notch {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 28px;
+        background: #0f0f1a;
+        border-radius: 0 0 16px 16px;
+        z-index: 5;
+      }
+      .phone-screen {
+        width: 100%;
+        height: 100%;
+        padding: 40px 18px 18px;
+        display: flex;
+        flex-direction: column;
+      }
+      .mock-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .mock-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #f5a623;
+      }
+      .mock-subtitle {
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-top: 2px;
+      }
+      .mock-icon-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 17px;
+        background: rgba(255, 255, 255, 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .mock-actions {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .mock-action {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid;
+      }
+      .mock-action-brain {
+        background: rgba(124, 92, 252, 0.08);
+        border-color: rgba(124, 92, 252, 0.18);
+      }
+      .mock-action-set {
+        background: rgba(245, 166, 35, 0.08);
+        border-color: rgba(245, 166, 35, 0.18);
+      }
+      .mock-action-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .mock-action-desc {
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.35);
+      }
+      .mock-section-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 8px;
+      }
+      .mock-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 8px;
+      }
+      .mock-card-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .mock-card-meta {
+        display: flex;
+        gap: 14px;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.35);
+        margin-bottom: 10px;
+      }
+      .mock-perform-btn {
+        width: 100%;
+        padding: 8px;
+        background: #f5a623;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: #0f0f1a;
+      }
+      .phone-glow {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 340px;
+        height: 620px;
+        background: radial-gradient(
+          ellipse,
+          rgba(245, 166, 35, 0.06) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .section {
+        padding: 100px 24px;
+        position: relative;
+      }
+      .section-header {
+        text-align: center;
+        margin-bottom: 56px;
+      }
+      .section-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #7c5cfc;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin-bottom: 14px;
+      }
+      .section-title {
+        font-size: 36px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -1px;
+        margin-bottom: 14px;
+      }
+      .section-subtitle {
+        font-size: 16px;
+        color: rgba(255, 255, 255, 0.45);
+        max-width: 480px;
+        margin: 0 auto;
+        line-height: 1.6;
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      .feature-card {
+        background: rgba(30, 30, 54, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        padding: 28px 24px;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+      }
+      .feature-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .feature-card:hover {
+        border-color: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+        background: rgba(30, 30, 54, 0.7);
+      }
+      .feature-card:hover::before {
+        opacity: 1;
+      }
+      .feature-icon-wrap {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 18px;
+      }
+      .feature-icon-wrap svg {
+        width: 22px;
+        height: 22px;
+      }
+      .feature-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 6px;
+      }
+      .feature-desc {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.4);
+        line-height: 1.6;
+      }
+
+      .how-it-works {
+        background: rgba(20, 20, 38, 0.5);
+        border-top: 1px solid rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .step {
+        text-align: center;
+        position: relative;
+      }
+      .step-number {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 40px;
+        font-weight: 700;
+        color: rgba(245, 166, 35, 0.12);
+        margin-bottom: 12px;
+        line-height: 1;
+      }
+      .step-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 6px;
+      }
+      .step-desc {
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.4);
+        line-height: 1.5;
+      }
+      .step-connector {
+        position: absolute;
+        top: 20px;
+        right: -12px;
+        width: 24px;
+        height: 1px;
+        background: rgba(245, 166, 35, 0.15);
+      }
+
+      .timer-showcase {
+        text-align: center;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      .timer-display {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 96px;
+        font-weight: 700;
+        color: #f5a623;
+        letter-spacing: -4px;
+        margin-bottom: 12px;
+        text-shadow: 0 0 60px rgba(245, 166, 35, 0.2);
+        animation: timer-pulse 2s ease-in-out infinite;
+      }
+      @keyframes timer-pulse {
+        0%, 100% { opacity: 1; text-shadow: 0 0 60px rgba(245, 166, 35, 0.2); }
+        50% { opacity: 0.85; text-shadow: 0 0 80px rgba(245, 166, 35, 0.3); }
+      }
+      .timer-label {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.35);
+        margin-bottom: 32px;
+      }
+      .timer-bits {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .timer-bit {
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .timer-bit-active {
+        background: rgba(245, 166, 35, 0.12);
+        border: 1px solid rgba(245, 166, 35, 0.25);
+        color: #f5a623;
+      }
+      .timer-bit-upcoming {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.35);
+      }
+
+      .cta-section {
+        text-align: center;
+        padding: 100px 24px;
+      }
+      .cta-title {
+        font-size: 40px;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: -1px;
+        margin-bottom: 16px;
+      }
+      .cta-text {
+        font-size: 17px;
+        color: rgba(255, 255, 255, 0.45);
+        max-width: 400px;
+        margin: 0 auto 36px;
+        line-height: 1.6;
+      }
+
+      .qr-section {
+        background: rgba(30, 30, 54, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 20px;
+        padding: 36px;
+        text-align: center;
+        max-width: 380px;
+        margin: 0 auto;
+      }
+      .qr-label {
+        font-size: 15px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.65);
+        margin-bottom: 18px;
+      }
+      .qr-code {
+        width: 180px;
+        height: 180px;
+        margin: 0 auto 18px;
+        background: #fff;
+        border-radius: 14px;
+        padding: 12px;
+      }
+      .qr-code canvas {
+        width: 100% !important;
+        height: 100% !important;
+      }
+      .open-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        border: 1px solid rgba(245, 166, 35, 0.25);
+        border-radius: 10px;
+        text-decoration: none;
+        color: #f5a623;
+        background: rgba(245, 166, 35, 0.06);
+        transition: all 0.2s;
+        margin-bottom: 14px;
+      }
+      .open-button:hover {
+        background: rgba(245, 166, 35, 0.14);
+        border-color: rgba(245, 166, 35, 0.4);
+      }
+      .store-links {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 6px;
+      }
+      .store-link {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.3);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      .store-link:hover {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 60px 0;
+      }
+      .spinner {
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-top-color: #f5a623;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        animation: spin 0.8s linear infinite;
+        margin: 20px auto;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .loading-text {
+        font-size: 15px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      footer {
+        text-align: center;
+        padding: 32px 24px;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.2);
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      footer a {
+        color: rgba(255, 255, 255, 0.35);
+        text-decoration: none;
+      }
+      footer a:hover {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      .divider {
+        width: 48px;
+        height: 2px;
+        background: linear-gradient(90deg, #f5a623, #7c5cfc);
+        margin: 0 auto 48px;
+        border-radius: 2px;
+      }
+
+      @media (max-width: 768px) {
+        nav { padding: 12px 16px; }
+        .nav-links { display: none; }
+        .hero { padding: 80px 16px 48px; min-height: auto; }
+        .hero-title { font-size: 36px; letter-spacing: -1px; }
+        .hero-subtitle { font-size: 15px; }
+        .hero-cta { flex-direction: column; width: 100%; max-width: 300px; margin-left: auto; margin-right: auto; }
+        .btn-large { width: 100%; }
+        .phone-mockup { width: 240px; }
+        .phone-frame { width: 240px; height: 480px; border-radius: 30px; }
+        .phone-notch { width: 100px; height: 24px; }
+        .phone-screen { padding: 34px 14px 14px; }
+        .mock-title { font-size: 18px; }
+        .features-grid { grid-template-columns: 1fr; max-width: 400px; }
+        .steps { grid-template-columns: repeat(2, 1fr); gap: 24px 16px; }
+        .step-connector { display: none; }
+        .section { padding: 64px 20px; }
+        .section-title { font-size: 28px; }
+        .timer-display { font-size: 56px; letter-spacing: -2px; }
+        .cta-title { font-size: 28px; }
+        .cta-section { padding: 64px 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/" class="nav-brand">
+        <img src="/assets/images/icon.png" alt="APP_NAME_PLACEHOLDER" class="nav-logo" />
+        <span class="nav-title">APP_NAME_PLACEHOLDER</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#how" class="nav-link">How It Works</a>
+        <a href="#download" class="nav-link">Download</a>
+      </div>
+      <div class="nav-actions">
+        <a href="#" class="btn btn-ghost" id="signin-btn">Sign In</a>
+        <a href="#" class="btn btn-primary" id="signup-btn">Sign Up</a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">Opening in Expo Go...</div>
+      </div>
+
+      <div class="hero-content" id="content">
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          Built for comedians
+        </div>
+
+        <h1 class="hero-title">
+          Own every second<br />on <span class="highlight">stage</span>
+        </h1>
+        <p class="hero-subtitle">
+          Time your set, follow your notes, record your performance, and get AI coaching — all from your phone.
+        </p>
+
+        <div class="hero-cta">
+          <a href="#download" class="btn btn-primary btn-large">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Get Started Free
+          </a>
+          <a href="#features" class="btn btn-ghost btn-large">See Features</a>
+        </div>
+
+        <div class="phone-mockup">
+          <div class="phone-glow"></div>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <div class="mock-header">
+                <div>
+                  <div class="mock-title">SetFlow</div>
+                  <div class="mock-subtitle">Your comedy set assistant</div>
+                </div>
+                <div class="mock-icon-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+              </div>
+              <div class="mock-actions">
+                <div class="mock-action mock-action-brain">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 3-1.5 5-3 6.5V18a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.5C6.5 14 5 12 5 9a7 7 0 0 1 7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+                  <div>
+                    <div class="mock-action-label">Brain Drain</div>
+                    <div class="mock-action-desc">Capture ideas</div>
+                  </div>
+                </div>
+                <div class="mock-action mock-action-set">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  <div>
+                    <div class="mock-action-label">Build a Set</div>
+                    <div class="mock-action-desc">Create set list</div>
+                  </div>
+                </div>
+              </div>
+              <div class="mock-section-label">Your Sets</div>
+              <div class="mock-card">
+                <div class="mock-card-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#f5a623" stroke="none"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#f5a623" fill="none" stroke-width="2"/></svg>
+                  Thursday Open Mic
+                </div>
+                <div class="mock-card-meta">
+                  <span>5:00</span>
+                  <span>4 bits</span>
+                </div>
+                <div class="mock-perform-btn">Perform</div>
+              </div>
+              <div class="mock-card">
+                <div class="mock-card-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#f5a623" stroke="none"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#f5a623" fill="none" stroke-width="2"/></svg>
+                  New Material
+                </div>
+                <div class="mock-card-meta">
+                  <span>3:30</span>
+                  <span>3 bits</span>
+                </div>
+                <div class="mock-perform-btn">Perform</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="section-header">
+        <div class="section-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Features
+        </div>
+        <h2 class="section-title">Everything you need on stage</h2>
+        <p class="section-subtitle">Built around the way comedians actually work — from scribbling ideas at 2am to killing it on stage.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card" style="--accent: #f5a623;">
+          <div class="feature-icon-wrap" style="background: rgba(245, 166, 35, 0.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#f5a623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="feature-title">Live Countdown</div>
+          <div class="feature-desc">Big JetBrains Mono timer counts down your set in real time. Always know where you stand.</div>
+        </div>
+
+        <div class="feature-card" style="--accent: #7c5cfc;">
+          <div class="feature-icon-wrap" style="background: rgba(124, 92, 252, 0.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <div class="feature-title">Synced Notes</div>
+          <div class="feature-desc">Your bit notes auto-scroll as the timer progresses. Like a teleprompter for comedy.</div>
+        </div>
+
+        <div class="feature-card" style="--accent: #FF6B6B;">
+          <div class="feature-icon-wrap" style="background: rgba(255, 107, 107, 0.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </div>
+          <div class="feature-title">Audio Recording</div>
+          <div class="feature-desc">Record every set automatically. Play it back later to hear what actually landed.</div>
+        </div>
+
+        <div class="feature-card" style="--accent: #2ED573;">
+          <div class="feature-icon-wrap" style="background: rgba(46, 213, 115, 0.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2ED573" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div class="feature-title">AI Coaching</div>
+          <div class="feature-desc">Get Gemini-powered feedback on your timing, structure, and pacing after every performance.</div>
+        </div>
+
+        <div class="feature-card" style="--accent: #45AAF2;">
+          <div class="feature-icon-wrap" style="background: rgba(69, 170, 242, 0.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#45AAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 1 7 7c0 3-1.5 5-3 6.5V18a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.5C6.5 14 5 12 5 9a7 7 0 0 1 7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+          </div>
+          <div class="feature-title">Brain Drain</div>
+          <div class="feature-desc">Capture every random idea the moment it hits. Tag it, filter it, turn it into a bit later.</div>
+        </div>
+
+        <div class="feature-card" style="--accent: #FFA502;">
+          <div class="feature-icon-wrap" style="background: rgba(255, 165, 2, 0.1);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#FFA502" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </div>
+          <div class="feature-title">Set Builder</div>
+          <div class="feature-desc">Build your set list bit by bit — name them, time them, reorder with drag and drop.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section how-it-works" id="how">
+      <div class="section-header">
+        <div class="section-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          How It Works
+        </div>
+        <h2 class="section-title">From idea to applause</h2>
+        <p class="section-subtitle">Four steps. Zero friction.</p>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">01</div>
+          <div class="step-title">Brain Drain</div>
+          <div class="step-desc">Dump every idea as it comes. Tag them by type for easy sorting later.</div>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step">
+          <div class="step-number">02</div>
+          <div class="step-title">Build Your Set</div>
+          <div class="step-desc">Pick your best bits, add notes and timing, and order them for maximum impact.</div>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step">
+          <div class="step-number">03</div>
+          <div class="step-title">Perform</div>
+          <div class="step-desc">Hit the stage with a timer and notes that follow your flow. Audio records automatically.</div>
+          <div class="step-connector"></div>
+        </div>
+        <div class="step">
+          <div class="step-number">04</div>
+          <div class="step-title">Get Feedback</div>
+          <div class="step-desc">AI analyzes your set structure and pacing, giving you coaching notes to improve.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="timer-section">
+      <div class="section-header">
+        <div class="section-label">Performance Mode</div>
+        <h2 class="section-title">A timer that respects your craft</h2>
+        <p class="section-subtitle">Large, readable, auto-synced to your bits. Skip ahead or let it flow.</p>
+      </div>
+      <div class="timer-showcase">
+        <div class="timer-display" id="timer-text">4:32</div>
+        <div class="timer-label">Auto-synced to your current bit</div>
+        <div class="timer-bits">
+          <div class="timer-bit timer-bit-upcoming">Opener</div>
+          <div class="timer-bit timer-bit-active">Dating App Rant</div>
+          <div class="timer-bit timer-bit-upcoming">Airport Security</div>
+          <div class="timer-bit timer-bit-upcoming">Closer</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section" id="download">
+      <h2 class="cta-title">Ready to level up your sets?</h2>
+      <p class="cta-text">Free to use. No account required to get started.</p>
+
+      <div class="qr-section">
+        <div class="qr-label">Scan to open in Expo Go</div>
+        <div class="qr-code" id="qr-code"></div>
+        <a href="exps://EXPS_URL_PLACEHOLDER" class="open-button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          Open in Expo Go
+        </a>
+        <div class="store-links">
+          <a href="https://apps.apple.com/app/id982107779" class="store-link" target="_blank">App Store</a>
+          <a href="https://play.google.com/store/apps/details?id=host.exp.exponent" class="store-link" target="_blank">Google Play</a>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>SetFlow &mdash; Built for comedians, by comedians.</p>
+    </footer>
+
+    <script src="https://unpkg.com/qr-code-styling@1.6.0/lib/qr-code-styling.js"></script>
+    <script>
+      (function () {
+        var ua = navigator.userAgent;
+        var loadingEl = document.getElementById("loading");
+        var contentEl = document.getElementById("content");
+        var isAndroid = /Android/i.test(ua);
+        var isIOS =
+          /iPhone|iPad|iPod/i.test(ua) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        var deepLink = "exps://EXPS_URL_PLACEHOLDER";
+
+        var qrCode = new QRCodeStyling({
+          width: 400,
+          height: 400,
+          data: deepLink,
+          dotsOptions: { color: "#0f0f1a", type: "rounded" },
+          backgroundOptions: { color: "#ffffff" },
+          cornersSquareOptions: { type: "extra-rounded" },
+          cornersDotOptions: { type: "dot" },
+          qrOptions: { errorCorrectionLevel: "H" },
+        });
+        qrCode.append(document.getElementById("qr-code"));
+
+        if (isAndroid || isIOS) {
+          loadingEl.style.display = "block";
+          contentEl.style.display = "none";
+          window.location.href = deepLink;
+          setTimeout(function () {
+            loadingEl.style.display = "none";
+            contentEl.style.display = "block";
+          }, 500);
+        }
+
+        var timerEl = document.getElementById("timer-text");
+        var seconds = 272;
+        function tickTimer() {
+          var m = Math.floor(seconds / 60);
+          var s = seconds % 60;
+          timerEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
+          seconds--;
+          if (seconds < 0) seconds = 300;
+        }
+        setInterval(tickTimer, 1000);
+      })();
+    </script>
+  </body>
+</html>
+
+
